@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, memo } from 'react';
-import { Card, CardContent, Typography, Box } from '@mui/material';
+import { Box, Typography } from '@mui/material';
 import GaugeChart from 'react-gauge-chart';
 
 const AnimatedGauge = memo(({ id, value, normalizedValue, label, formatValue, colors }) => {
@@ -45,52 +45,41 @@ const AnimatedGauge = memo(({ id, value, normalizedValue, label, formatValue, co
   }, [normalizedValue]);
 
   return (
-    <Card sx={{ 
-      height: '100%', 
-      display: 'flex', 
+    <Box sx={{ 
+      width: '100%',
+      height: '100%',
+      display: 'flex',
       flexDirection: 'column',
-      minHeight: '250px',
-      position: 'relative'
+      alignItems: 'center',
+      justifyContent: 'center'
     }}>
-      <CardContent sx={{ 
-        flex: 1,
-        display: 'flex',
-        flexDirection: 'column',
-        padding: '16px !important'
+      <Box sx={{ 
+        width: '100%',
+        height: '200px',
+        position: 'relative',
+        '& > div': {
+          position: 'absolute !important',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          width: '100% !important',
+          height: '100% !important',
+        }
       }}>
-        <Typography 
-          color="textSecondary" 
-          gutterBottom
-          sx={{ mb: 1 }}
-        >
-          {label}
-        </Typography>
-        <Box sx={{ 
-          flex: 1,
-          position: 'relative',
-          '& > div': {
-            position: 'absolute !important',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-          }
-        }}>
-          <GaugeChart
-            id={id}
-            nrOfLevels={20}
-            percent={animatedValue}
-            colors={colors}
-            arcWidth={0.3}
-            textColor="#000000"
-            formatTextValue={() => formatValue(value)}
-            cornerRadius={3}
-            marginInPercent={0.02}
-            animate={false}
-          />
-        </Box>
-      </CardContent>
-    </Card>
+        <GaugeChart
+          id={id}
+          nrOfLevels={20}
+          percent={animatedValue}
+          colors={colors}
+          arcWidth={0.3}
+          textColor="#000000"
+          formatTextValue={() => formatValue(value)}
+          cornerRadius={3}
+          marginInPercent={0.02}
+          animate={false}
+        />
+      </Box>
+    </Box>
   );
 });
 

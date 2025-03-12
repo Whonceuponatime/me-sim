@@ -1,4 +1,4 @@
-from fastapi import FastAPI, WebSocket
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
@@ -67,11 +67,19 @@ async def broadcast_state():
             
             for connection in current_connections:
                 try:
+                    if connection not in connections:
+                        continue
                     await connection.send_json(modbus_state)
                     await asyncio.sleep(0.1)  # Small delay between messages
+                    if connection not in connections:
+                        continue
                     await connection.send_json(mqtt_state)
-                except:
-                    connections.remove(connection)
+                except Exception as e:
+                    print(f"Error broadcasting to client: {e}")
+                    try:
+                        connections.remove(connection)
+                    except KeyError:
+                        pass  # Connection was already removed
         
         await asyncio.sleep(1)
 
@@ -105,7 +113,9 @@ async def shutdown_event():
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
+    print(f"New WebSocket connection from {websocket.client}")
     connections.add(websocket)
+    
     try:
         while True:
             try:
@@ -141,10 +151,22 @@ async def websocket_endpoint(websocket: WebSocket):
                         plc.set_setpoint(data["parameter"], data["value"])
                     # Send acknowledgment
                     await websocket.send_json({"status": "ok", "command": data["command"]})
+            except json.JSONDecodeError as e:
+                print(f"Invalid JSON received: {e}")
+                continue
             except Exception as e:
-                print(f"Error in websocket: {e}")  # Debug log
-    except:
-        connections.remove(websocket)
+                print(f"Error processing WebSocket message: {e}")
+                if websocket in connections:
+                    connections.remove(websocket)
+                break
+    except WebSocketDisconnect:
+        print(f"WebSocket client disconnected normally")
+    except Exception as e:
+        print(f"WebSocket error: {e}")
+    finally:
+        if websocket in connections:
+            connections.remove(websocket)
+        print(f"WebSocket connection closed. Active connections: {len(connections)}")
 
 @app.get("/api/status")
 async def get_status():
