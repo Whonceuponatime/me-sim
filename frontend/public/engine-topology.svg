@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="800" height="600" version="1.1" viewBox="0 0 800 600" xmlns="http://www.w3.org/2000/svg">
+ <g fill="none" stroke="#000">
+  <!-- Main Engine Block -->
+  <rect x="250" y="200" width="300" height="200" stroke-width="3"/>
+  
+  <!-- Turbocharger -->
+  <circle cx="600" cy="250" r="40" stroke-width="2"/>
+  <path d="m580 250h40" stroke-width="2"/>
+  <path d="m600 230v40" stroke-width="2"/>
+  
+  <!-- Exhaust System -->
+  <path d="m550 200c0 0 50-50 50-100" stroke-width="3"/>
+  <rect x="575" y="80" width="50" height="30" stroke-width="2"/>
+  
+  <!-- Cooling System -->
+  <path d="m250 350c-50 0-100-50-100-100" stroke-width="2"/>
+  <rect x="125" y="225" width="40" height="50" stroke-width="2"/>
+  
+  <!-- Lubrication System -->
+  <path d="m300 400v50" stroke-width="2"/>
+  <rect x="275" y="450" width="50" height="30" stroke-width="2"/>
+  
+  <!-- Connecting Lines -->
+  <path d="m550 250h30" stroke-width="2"/>
+  <path d="m165 250h85" stroke-width="2"/>
+  
+  <!-- Labels -->
+  <g fill="#000" font-family="Arial" font-size="14">
+    <text x="350" y="300">Main Engine</text>
+    <text x="580" y="220">Turbocharger</text>
+    <text x="575" y="70">Exhaust</text>
+    <text x="100" y="250">Cooling</text>
+    <text x="270" y="495">Lubrication</text>
+  </g>
+ </g>
+</svg> 
