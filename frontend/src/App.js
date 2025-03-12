@@ -206,11 +206,19 @@ function App() {
             const newHistoryPoint = {
               time: new Date().toLocaleTimeString(),
               ...data.engine,
-              // Add the latest MQTT values to the history point
-              exhaust_temp: mqttData.exhaust_temp.value,
-              lube_oil_pressure: mqttData.lube_oil_pressure.value,
-              cooling_water_temp: mqttData.cooling_water_temp.value,
-              turbocharger_speed: mqttData.turbocharger_speed.value
+              // Keep the previous MQTT values in the history point
+              exhaust_temp: prevData.history.length > 0 
+                ? prevData.history[prevData.history.length - 1].exhaust_temp 
+                : 0,
+              lube_oil_pressure: prevData.history.length > 0 
+                ? prevData.history[prevData.history.length - 1].lube_oil_pressure 
+                : 0,
+              cooling_water_temp: prevData.history.length > 0 
+                ? prevData.history[prevData.history.length - 1].cooling_water_temp 
+                : 0,
+              turbocharger_speed: prevData.history.length > 0 
+                ? prevData.history[prevData.history.length - 1].turbocharger_speed 
+                : 0
             };
             
             return {
@@ -231,6 +239,7 @@ function App() {
             }));
           }
         } else if (data.type === 'mqtt') {
+          // Update MQTT state
           setMqttData(prevData => ({
             ...prevData,
             ...data.sensors
