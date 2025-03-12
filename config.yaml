@@ -1,0 +1,32 @@
+# Main Engine Simulation Configuration
+
+modbus:
+  host: "0.0.0.0"
+  port: 502
+
+engine:
+  # RPM ranges
+  rpm_min: 600
+  rpm_max: 1200
+  rpm_normal: 900
+  
+  # Temperature ranges (°C)
+  temp_min: 70
+  temp_max: 120
+  temp_normal: 85
+  
+  # Fuel flow ranges (tons/hour)
+  fuel_flow_min: 0.5
+  fuel_flow_max: 2.5
+  fuel_flow_normal: 1.5
+
+  # Update interval (seconds)
+  update_interval: 1.0
+
+# Modbus register mapping
+registers:
+  rpm: 0        # Engine RPM
+  temp: 1       # Engine Temperature
+  fuel_flow: 2  # Fuel Flow Rate
+  load: 3       # Engine Load
+  status: 4     # Engine Status (0: Stopped, 1: Running, 2: Warning, 3: Alarm) 
