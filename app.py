@@ -13,13 +13,24 @@ from sensors.mqtt_sensor import MQTTSensor
 
 app = FastAPI(title="ME Simulator")
 
-# CORS middleware
+# Define allowed origins
+origins = [
+    "http://localhost:3000",
+    "https://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:8000",
+    "ws://localhost:8000",
+    "ws://localhost:3000"
+]
+
+# CORS middleware with explicit origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
+    expose_headers=["*"]
 )
 
 # Serve static files (React frontend)
@@ -112,22 +123,25 @@ async def shutdown_event():
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
-    await websocket.accept()
-    print(f"New WebSocket connection from {websocket.client}")
-    connections.add(websocket)
-    
+    client = getattr(websocket, "client", "Unknown client")
+    print(f"WebSocket connection attempt from {client}")
     try:
+        print("Attempting WebSocket handshake...")
+        await websocket.accept()
+        print(f"WebSocket connection accepted from {client}")
+        connections.add(websocket)
+        print(f"Added to connections pool. Active connections: {len(connections)}")
+        
         while True:
             try:
                 data = await websocket.receive_json()
-                print(f"Received command: {data}")  # Debug log
+                print(f"Received command from {client}: {data}")
                 
                 if "command" in data:
                     if data["command"] == "start_engine":
-                        print("Starting engine...")  # Debug log
+                        print(f"Starting engine for {client}...")
                         simulator.running = True
-                        # Send immediate feedback
-                        await websocket.send_json({
+                        response = {
                             "type": "modbus",
                             "engine": {
                                 "status": simulator.status,
@@ -136,37 +150,46 @@ async def websocket_endpoint(websocket: WebSocket):
                                 "fuel_flow": simulator.current_fuel_flow,
                                 "load": simulator.current_load
                             }
-                        })
+                        }
+                        print(f"Sending response to {client}: {response}")
+                        await websocket.send_json(response)
                     elif data["command"] == "stop_engine":
-                        print("Stopping engine...")  # Add logging
+                        print(f"Stopping engine for {client}...")
                         simulator.running = False
-                        await websocket.send_json({
+                        response = {
                             "status": "ok",
                             "command": "stop_engine",
                             "engine_status": simulator.status
-                        })
+                        }
+                        print(f"Sending response to {client}: {response}")
+                        await websocket.send_json(response)
                     elif data["command"] == "set_mode":
+                        print(f"Setting mode for {client}: {data['mode']}")
                         plc.set_mode(data["mode"])
                     elif data["command"] == "set_setpoint":
+                        print(f"Setting setpoint for {client}: {data['parameter']} = {data['value']}")
                         plc.set_setpoint(data["parameter"], data["value"])
+                    
                     # Send acknowledgment
-                    await websocket.send_json({"status": "ok", "command": data["command"]})
+                    ack = {"status": "ok", "command": data["command"]}
+                    print(f"Sending acknowledgment to {client}: {ack}")
+                    await websocket.send_json(ack)
             except json.JSONDecodeError as e:
-                print(f"Invalid JSON received: {e}")
+                print(f"Invalid JSON received from {client}: {e}")
                 continue
             except Exception as e:
-                print(f"Error processing WebSocket message: {e}")
+                print(f"Error processing WebSocket message from {client}: {e}")
                 if websocket in connections:
                     connections.remove(websocket)
                 break
     except WebSocketDisconnect:
-        print(f"WebSocket client disconnected normally")
+        print(f"WebSocket client {client} disconnected normally")
     except Exception as e:
-        print(f"WebSocket error: {e}")
+        print(f"WebSocket error with {client}: {e}")
     finally:
         if websocket in connections:
             connections.remove(websocket)
-        print(f"WebSocket connection closed. Active connections: {len(connections)}")
+        print(f"WebSocket connection closed for {client}. Active connections: {len(connections)}")
 
 @app.get("/api/status")
 async def get_status():

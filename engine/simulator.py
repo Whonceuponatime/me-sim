@@ -69,8 +69,8 @@ class MainEngineSimulator:
             
     async def _simulation_loop(self):
         """Async simulation loop"""
+        print(f"Simulation loop. Engine running: {self._running}")
         while True:
-            print(f"Simulation loop. Engine running: {self._running}")
             self.calculate_engine_parameters()
             self.update_modbus_registers()
             await asyncio.sleep(self.config['engine']['update_interval'])
