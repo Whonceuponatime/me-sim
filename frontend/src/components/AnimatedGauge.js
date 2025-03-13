@@ -1,84 +1,117 @@
-import React, { useState, useRef, useEffect, memo } from 'react';
-import { Box, Typography } from '@mui/material';
+import React, { useState, useRef, useEffect, memo, useMemo } from 'react';
+import { Box } from '@mui/material';
 import GaugeChart from 'react-gauge-chart';
 
-const AnimatedGauge = memo(({ id, value, normalizedValue, label, formatValue, colors }) => {
-  const [animatedValue, setAnimatedValue] = useState(0);
+const GAUGE_SIZE = 200;
+
+const AnimatedGauge = memo(({ id, value, normalizedValue, label, formatValue, colors, ...props }) => {
+  const [animatedValue, setAnimatedValue] = useState(normalizedValue);
+  const animationRef = useRef(null);
+  const velocityRef = useRef(0);
   const prevValueRef = useRef(normalizedValue);
-  const animationFrameRef = useRef();
+
+  // Fixed container style with absolute dimensions
+  const containerStyle = useMemo(() => ({
+    width: GAUGE_SIZE,
+    height: GAUGE_SIZE,
+    position: 'relative',
+    margin: '0 auto',
+    '& > div': {
+      width: `${GAUGE_SIZE}px !important`,
+      height: `${GAUGE_SIZE}px !important`,
+      position: 'absolute !important',
+      top: '50%',
+      left: '50%',
+      transform: 'translate(-50%, -50%)',
+      '& svg': {
+        width: `${GAUGE_SIZE}px !important`,
+        height: `${GAUGE_SIZE}px !important`,
+        position: 'absolute !important',
+        left: 0,
+        top: 0,
+        willChange: 'transform'
+      }
+    }
+  }), []);
+
+  // Memoize chart props
+  const chartProps = useMemo(() => ({
+    id,
+    nrOfLevels: 20,
+    colors,
+    arcWidth: 0.3,
+    textColor: props.textColor || "#ffffff",
+    needleColor: props.needleColor || "#ffffff",
+    needleBaseColor: props.needleColor || "#ffffff",
+    cornerRadius: 3,
+    marginInPercent: 0.02,
+    animate: false
+  }), [id, colors, props.textColor, props.needleColor]);
 
   useEffect(() => {
-    if (animationFrameRef.current) {
-      cancelAnimationFrame(animationFrameRef.current);
+    const targetValue = normalizedValue;
+    const currentValue = prevValueRef.current;
+
+    // Reset animation if it's running
+    if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current);
     }
 
-    const startValue = prevValueRef.current;
-    const endValue = normalizedValue;
-    const duration = 1000;
-    const startTime = performance.now();
+    // Spring animation parameters
+    const stiffness = 0.025; // Lower = more gradual movement
+    const damping = 0.75;    // Higher = less oscillation
+    const mass = 1;          // Higher = more inertia
 
-    const animate = (currentTime) => {
-      const elapsed = currentTime - startTime;
-      const progress = Math.min(elapsed / duration, 1);
+    let velocity = velocityRef.current;
+    let position = currentValue;
 
-      const easeProgress = progress < 0.5
-        ? 4 * progress * progress * progress
-        : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+    const animate = () => {
+      // Calculate spring force
+      const displacement = targetValue - position;
+      const springForce = displacement * stiffness;
+      
+      // Apply forces and update velocity
+      const dampingForce = -velocity * damping;
+      const acceleration = (springForce + dampingForce) / mass;
+      velocity += acceleration;
+      
+      // Update position
+      position += velocity;
 
-      const currentValue = startValue + (endValue - startValue) * easeProgress;
-      setAnimatedValue(currentValue);
+      // Update the gauge
+      setAnimatedValue(position);
+      prevValueRef.current = position;
 
-      if (progress < 1) {
-        animationFrameRef.current = requestAnimationFrame(animate);
+      // Stop conditions
+      const isSettled = Math.abs(displacement) < 0.0001 && Math.abs(velocity) < 0.0001;
+      
+      if (!isSettled) {
+        animationRef.current = requestAnimationFrame(animate);
       } else {
-        prevValueRef.current = endValue;
+        // Ensure we end exactly at the target
+        setAnimatedValue(targetValue);
+        prevValueRef.current = targetValue;
+        velocityRef.current = 0;
       }
     };
 
-    animationFrameRef.current = requestAnimationFrame(animate);
+    // Start animation
+    animationRef.current = requestAnimationFrame(animate);
 
     return () => {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
       }
     };
   }, [normalizedValue]);
 
   return (
-    <Box sx={{ 
-      width: '100%',
-      height: '100%',
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center'
-    }}>
-      <Box sx={{ 
-        width: '100%',
-        height: '200px',
-        position: 'relative',
-        '& > div': {
-          position: 'absolute !important',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          width: '100% !important',
-          height: '100% !important',
-        }
-      }}>
-        <GaugeChart
-          id={id}
-          nrOfLevels={20}
-          percent={animatedValue}
-          colors={colors}
-          arcWidth={0.3}
-          textColor="#000000"
-          formatTextValue={() => formatValue(value)}
-          cornerRadius={3}
-          marginInPercent={0.02}
-          animate={false}
-        />
-      </Box>
+    <Box sx={containerStyle}>
+      <GaugeChart
+        {...chartProps}
+        percent={animatedValue}
+        formatTextValue={() => formatValue(value)}
+      />
     </Box>
   );
 });
