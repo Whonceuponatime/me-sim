@@ -4,12 +4,14 @@ import {
   Table, TableBody, TableCell, TableContainer, 
   TableHead, TableRow, Alert, Tab, Tabs, Box,
   Card, CardContent, CardHeader, Divider,
-  AppBar, Toolbar
+  AppBar, Toolbar, LinearProgress,
+  createTheme, ThemeProvider
 } from '@mui/material';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import GaugeChart from 'react-gauge-chart';
 import AnimatedGauge from './components/AnimatedGauge';
 import TopologyView from './components/TopologyView';
+import logo from './assets/logo.png';
 
 const WEBSOCKET_URL = process.env.REACT_APP_WS_URL || 'ws://localhost:8000/ws';
 const RECONNECT_DELAY = 2000; // 2 seconds delay between reconnection attempts
@@ -28,6 +30,79 @@ const ENGINE_CONFIG = {
   load_warning: 80,
   load_critical: 90
 };
+
+// Add sensor configuration constants
+const SENSOR_CONFIG = {
+  exhaust_temp: {
+    min: 0,
+    max: 600,
+    warning: 450,
+    critical: 500,
+    unit: '°C'
+  },
+  lube_oil_pressure: {
+    min: 0,
+    max: 10,
+    warning: 3,
+    critical: 2,
+    unit: 'bar'
+  },
+  cooling_water_temp: {
+    min: 0,
+    max: 100,
+    warning: 75,
+    critical: 85,
+    unit: '°C'
+  },
+  turbocharger_speed: {
+    min: 0,
+    max: 150000,
+    warning: 120000,
+    critical: 130000,
+    unit: 'rpm'
+  }
+};
+
+// Create dark theme for marine look
+const darkTheme = createTheme({
+  palette: {
+    mode: 'dark',
+    primary: {
+      main: '#00ff00',
+    },
+    secondary: {
+      main: '#ff9800',
+    },
+    background: {
+      default: '#1a1a1a',
+      paper: '#2d2d2d',
+    },
+    text: {
+      primary: '#ffffff',
+      secondary: '#b0b0b0',
+    },
+  },
+  components: {
+    MuiCard: {
+      styleOverrides: {
+        root: {
+          backgroundColor: '#2d2d2d',
+          border: '1px solid #404040',
+          borderRadius: 8,
+        },
+      },
+    },
+    MuiButton: {
+      styleOverrides: {
+        root: {
+          borderRadius: 8,
+          textTransform: 'none',
+          fontWeight: 600,
+        },
+      },
+    },
+  },
+});
 
 function TabPanel({ children, value, index }) {
   return (
@@ -241,347 +316,312 @@ function App() {
   };
 
   // Helper function for gauge colors
-  const getGaugeColors = (value, { warning, critical }) => {
-    if (value < warning) return ["#00FF00", "#FFA500"];
-    if (value < critical) return ["#FFA500", "#FF0000"];
-    return ["#FF0000"];
+  const getGaugeColors = (value, warning, critical) => {
+    if (value < warning) return ["#4caf50", "#ff9800"]; // Green to Orange
+    if (value < critical) return ["#ff9800", "#f44336"]; // Orange to Red
+    return ["#f44336"]; // Red
   };
 
   const handleTabChange = (event, newValue) => {
     setCurrentTab(newValue);
   };
 
-  return (
-    <Box sx={{ 
-      minHeight: '100vh',
-      backgroundColor: '#f5f7fa'
-    }}>
-      <AppBar position="static" color="default" elevation={0} sx={{ backgroundColor: 'white', borderBottom: '1px solid #e0e0e0' }}>
-        <Toolbar>
-          <Box sx={{ 
-            display: 'flex', 
-            justifyContent: 'space-between', 
-            alignItems: 'center',
-            width: '100%'
-          }}>
-            <img 
-              src="/resources/logo.png" 
-              alt="SEACURE Logo" 
-              style={{
-                height: '40px',
-                objectFit: 'contain'
-              }}
-            />
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <Button 
-                variant="contained" 
-                color="success"
-                size="large"
-                onClick={() => sendCommand('start_engine')}
-                disabled={engineData.status === 1}
-                sx={{ 
-                  borderRadius: 2,
-                  textTransform: 'none',
-                  px: 3
-                }}
-              >
-                {engineData.status === 1 ? 'Engine Running' : 'Start Engine'}
-              </Button>
-              <Button 
-                variant="contained" 
-                color="error"
-                size="large"
-                onClick={() => sendCommand('stop_engine')}
-                disabled={engineData.status === 0}
-                sx={{ 
-                  borderRadius: 2,
-                  textTransform: 'none',
-                  px: 3
-                }}
-              >
-                Stop Engine
-              </Button>
-            </Box>
-          </Box>
-        </Toolbar>
-      </AppBar>
+  // Add SensorGauge component
+  const SensorGauge = memo(({ label, value, config }) => {
+    const normalizedValue = ((value - config.min) / (config.max - config.min)) * 100;
+    
+    let color = '#4caf50'; // Green
+    if (value >= config.critical) {
+      color = '#f44336'; // Red
+    } else if (value >= config.warning) {
+      color = '#ff9800'; // Orange
+    }
 
-      <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
-        <Box sx={{ 
-          borderRadius: 2,
-          backgroundColor: 'white',
-          mb: 3,
-          boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
-        }}>
-          <Tabs 
-            value={currentTab} 
-            onChange={handleTabChange}
-            sx={{ 
-              '& .MuiTab-root': {
-                textTransform: 'none',
-                fontSize: '1rem',
-                fontWeight: 500,
-                minHeight: 56
-              }
-            }}
-          >
-            <Tab label="Dashboard" />
-            <Tab label="Topology View" />
-          </Tabs>
+    return (
+      <Box sx={{ width: '100%', mb: 2 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+          <Typography variant="body2">{label}</Typography>
+          <Typography variant="body2" color="textSecondary">
+            {value.toFixed(1)} {config.unit}
+          </Typography>
         </Box>
+        <LinearProgress
+          variant="determinate"
+          value={normalizedValue}
+          sx={{
+            height: 10,
+            borderRadius: 5,
+            backgroundColor: '#e0e0e0',
+            '& .MuiLinearProgress-bar': {
+              backgroundColor: color,
+              borderRadius: 5
+            }
+          }}
+        />
+      </Box>
+    );
+  });
 
-        {currentTab === 0 ? (
+  return (
+    <ThemeProvider theme={darkTheme}>
+      <Box sx={{ 
+        minHeight: '100vh',
+        backgroundColor: '#1a1a1a',
+        pt: 2
+      }}>
+        <AppBar position="static" color="transparent" elevation={0} sx={{ borderBottom: '1px solid #404040', mb: 3 }}>
+          <Toolbar>
+            <Box sx={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center',
+              width: '100%'
+            }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <img 
+                  src={logo}
+                  alt="Engine Control System Logo" 
+                  style={{ 
+                    height: '40px',
+                    width: 'auto',
+                    marginRight: '16px',
+                    filter: 'brightness(1.2)'
+                  }} 
+                />
+                <Typography variant="h5" sx={{ color: '#00ff00', fontWeight: 600 }}>
+                  MAIN ENGINE CONTROL SYSTEM
+                </Typography>
+              </Box>
+              <Box sx={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: 2,
+                '& .status-indicator': {
+                  width: 12,
+                  height: 12,
+                  borderRadius: '50%',
+                  marginRight: 1
+                }
+              }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', mr: 4 }}>
+                  <Box 
+                    className="status-indicator"
+                    sx={{ 
+                      backgroundColor: engineData.status === 1 ? '#00ff00' : '#ff0000',
+                      boxShadow: engineData.status === 1 ? '0 0 10px #00ff00' : '0 0 10px #ff0000'
+                    }} 
+                  />
+                  <Typography variant="body2" sx={{ color: engineData.status === 1 ? '#00ff00' : '#ff0000' }}>
+                    {engineData.status === 1 ? 'ENGINE RUNNING' : 'ENGINE STOPPED'}
+                  </Typography>
+                </Box>
+                <Button 
+                  variant="contained" 
+                  color={engineData.status === 1 ? "error" : "primary"}
+                  size="large"
+                  onClick={() => sendCommand(engineData.status === 1 ? 'stop_engine' : 'start_engine')}
+                  sx={{ 
+                    minWidth: 150,
+                    height: 48,
+                    fontSize: '1rem'
+                  }}
+                >
+                  {engineData.status === 1 ? 'EMERGENCY STOP' : 'START ENGINE'}
+                </Button>
+              </Box>
+            </Box>
+          </Toolbar>
+        </AppBar>
+
+        <Container maxWidth="xl">
           <Grid container spacing={3}>
-            {/* Gauges Section */}
-            <Grid item xs={12}>
-              <Grid container spacing={3}>
-                {[
-                  {
-                    id: "rpm-gauge",
-                    value: engineData.rpm,
-                    normalizedValue: engineData.rpm / ENGINE_CONFIG.rpm_max,
-                    label: "Engine RPM",
-                    format: v => v.toFixed(0),
-                    colors: ["#00FF00", "#FF0000"]
-                  },
-                  {
-                    id: "temp-gauge",
-                    value: engineData.temperature,
-                    normalizedValue: (engineData.temperature - ENGINE_CONFIG.temp_min) / 
-                                   (ENGINE_CONFIG.temp_max - ENGINE_CONFIG.temp_min),
-                    label: "Temperature",
-                    format: v => `${v.toFixed(1)}°C`,
-                    colors: getGaugeColors(engineData.temperature, {
-                      warning: ENGINE_CONFIG.temp_warning,
-                      critical: ENGINE_CONFIG.temp_critical
-                    })
-                  },
-                  {
-                    id: "fuel-gauge",
-                    value: engineData.fuel_flow,
-                    normalizedValue: engineData.fuel_flow / ENGINE_CONFIG.fuel_flow_max,
-                    label: "Fuel Flow",
-                    format: v => `${v.toFixed(2)} t/h`,
-                    colors: ["#00FF00", "#FF0000"]
-                  },
-                  {
-                    id: "load-gauge",
-                    value: engineData.load,
-                    normalizedValue: engineData.load / 100,
-                    label: "Engine Load",
-                    format: v => `${v.toFixed(0)}%`,
-                    colors: getGaugeColors(engineData.load, {
-                      warning: ENGINE_CONFIG.load_warning,
-                      critical: ENGINE_CONFIG.load_critical
-                    })
+            {/* Main Engine Status Panel */}
+            <Grid item xs={12} md={6}>
+              <Card sx={{ height: '100%' }}>
+                <CardHeader 
+                  title={
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <Typography variant="h6">ENGINE STATUS</Typography>
+                      <Box 
+                        sx={{ 
+                          width: 10, 
+                          height: 10, 
+                          borderRadius: '50%',
+                          backgroundColor: engineData.status === 1 ? '#00ff00' : '#ff0000',
+                          boxShadow: engineData.status === 1 ? '0 0 10px #00ff00' : '0 0 10px #ff0000'
+                        }} 
+                      />
+                    </Box>
                   }
-                ].map(gauge => (
-                  <Grid item xs={12} md={3} key={gauge.id}>
-                    <Card sx={{ 
-                      borderRadius: 2,
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
-                      height: '100%'
-                    }}>
-                      <CardContent sx={{
-                        height: 280,
-                        display: 'flex',
-                        flexDirection: 'column'
-                      }}>
-                        <Typography 
-                          variant="h6" 
-                          gutterBottom 
-                          sx={{ 
-                            fontWeight: 500,
-                            mb: 2
-                          }}
-                        >
-                          {gauge.label}
-                        </Typography>
-                        <Box sx={{ 
-                          flex: 1,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          minHeight: 200
-                        }}>
-                          <AnimatedGauge
-                            id={gauge.id}
-                            value={gauge.value}
-                            normalizedValue={gauge.normalizedValue}
-                            label={gauge.label}
-                            formatValue={gauge.format}
-                            colors={gauge.colors}
-                          />
-                        </Box>
-                      </CardContent>
-                    </Card>
+                />
+                <CardContent>
+                  <Box sx={{ mb: 4 }}>
+                    <Typography variant="body2" color="textSecondary" gutterBottom>
+                      OPERATION MODE
+                    </Typography>
+                    <Typography variant="h6" sx={{ color: '#00ff00' }}>
+                      {plcData.mode}
+                    </Typography>
+                  </Box>
+                  <Grid container spacing={2}>
+                    <Grid item xs={4}>
+                      <Box sx={{ textAlign: 'center', mb: 1 }}>
+                        <Typography variant="h6" sx={{ color: 'textSecondary' }}>ENGINE RPM</Typography>
+                      </Box>
+                      <AnimatedGauge
+                        id="rpm-gauge"
+                        value={engineData.rpm}
+                        normalizedValue={engineData.rpm / ENGINE_CONFIG.rpm_max}
+                        label="RPM"
+                        formatValue={(value) => `${value.toFixed(0)} RPM`}
+                        colors={['#00ff00', '#ffff00', '#ff0000']}
+                        textColor="#00ffff"
+                        needleColor="#ffffff"
+                        fontSize="28px"
+                        fontWeight="bold"
+                      />
+                    </Grid>
+                    <Grid item xs={4}>
+                      <Box sx={{ textAlign: 'center', mb: 1 }}>
+                        <Typography variant="h6" sx={{ color: 'textSecondary' }}>ENGINE TEMP</Typography>
+                      </Box>
+                      <AnimatedGauge
+                        id="temp-gauge"
+                        value={engineData.temperature}
+                        normalizedValue={engineData.temperature / ENGINE_CONFIG.temp_max}
+                        label="TEMPERATURE"
+                        formatValue={(value) => `${value.toFixed(1)}°C`}
+                        colors={['#00ff00', '#ffff00', '#ff0000']}
+                        textColor="#00ffff"
+                        needleColor="#ffffff"
+                        fontSize="28px"
+                        fontWeight="bold"
+                      />
+                    </Grid>
+                    <Grid item xs={4}>
+                      <Box sx={{ textAlign: 'center', mb: 1 }}>
+                        <Typography variant="h6" sx={{ color: 'textSecondary' }}>ENGINE LOAD</Typography>
+                      </Box>
+                      <AnimatedGauge
+                        id="load-gauge"
+                        value={engineData.load}
+                        normalizedValue={engineData.load / 100}
+                        label="LOAD"
+                        formatValue={(value) => `${value.toFixed(0)}%`}
+                        colors={['#00ff00', '#ffff00', '#ff0000']}
+                        textColor="#00ffff"
+                        needleColor="#ffffff"
+                        fontSize="28px"
+                        fontWeight="bold"
+                      />
+                    </Grid>
                   </Grid>
-                ))}
-              </Grid>
-            </Grid>
-
-            {/* Charts Section */}
-            <Grid item xs={12} md={6}>
-              <Card sx={{ 
-                borderRadius: 2,
-                boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
-              }}>
-                <CardHeader 
-                  title={
-                    <Typography variant="h6" sx={{ fontWeight: 500 }}>
-                      Engine Performance
-                    </Typography>
-                  }
-                />
-                <Divider />
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <LineChart data={engineData.history}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                      <XAxis dataKey="time" stroke="#666" />
-                      <YAxis yAxisId="left" stroke="#8884d8" />
-                      <YAxis yAxisId="right" orientation="right" stroke="#82ca9d" />
-                      <Tooltip 
-                        contentStyle={{ 
-                          backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                          border: 'none',
-                          borderRadius: 8,
-                          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                        }}
-                      />
-                      <Legend />
-                      <Line 
-                        yAxisId="left"
-                        type="monotone" 
-                        dataKey="rpm" 
-                        stroke="#8884d8" 
-                        dot={false}
-                        name="RPM"
-                        strokeWidth={2}
-                      />
-                      <Line 
-                        yAxisId="right"
-                        type="monotone" 
-                        dataKey="load" 
-                        stroke="#82ca9d" 
-                        dot={false}
-                        name="Load %"
-                        strokeWidth={2}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
                 </CardContent>
               </Card>
             </Grid>
 
+            {/* Performance Trends */}
             <Grid item xs={12} md={6}>
-              <Card sx={{ 
-                borderRadius: 2,
-                boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
-              }}>
-                <CardHeader 
-                  title={
-                    <Typography variant="h6" sx={{ fontWeight: 500 }}>
-                      Temperature Monitoring
-                    </Typography>
-                  }
-                />
-                <Divider />
+              <Card>
+                <CardHeader title="PERFORMANCE TRENDS" />
                 <CardContent>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <LineChart data={engineData.history}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                      <XAxis dataKey="time" stroke="#666" />
-                      <YAxis domain={[0, 'auto']} stroke="#666" />
-                      <Tooltip 
-                        contentStyle={{ 
-                          backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                          border: 'none',
-                          borderRadius: 8,
-                          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                        }}
-                      />
-                      <Legend />
-                      <Line 
-                        type="monotone" 
-                        dataKey="temperature" 
-                        stroke="#ff7300" 
-                        dot={false}
-                        name="Engine Temp"
-                        strokeWidth={2}
-                      />
-                      <Line 
-                        type="monotone" 
-                        dataKey="exhaust_temp" 
-                        stroke="#ff0000" 
-                        dot={false}
-                        name="Exhaust Temp"
-                        strokeWidth={2}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
+                  <Box sx={{ height: 400 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={engineData.history}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#404040" />
+                        <XAxis 
+                          dataKey="time" 
+                          stroke="#b0b0b0"
+                          tick={{ fill: '#b0b0b0' }}
+                        />
+                        <YAxis 
+                          yAxisId="left" 
+                          stroke="#b0b0b0"
+                          tick={{ fill: '#b0b0b0' }}
+                        />
+                        <YAxis 
+                          yAxisId="right" 
+                          orientation="right" 
+                          stroke="#b0b0b0"
+                          tick={{ fill: '#b0b0b0' }}
+                        />
+                        <Tooltip 
+                          contentStyle={{ 
+                            backgroundColor: '#2d2d2d',
+                            border: '1px solid #404040',
+                            borderRadius: 8
+                          }}
+                        />
+                        <Legend />
+                        <Line
+                          yAxisId="left"
+                          type="monotone"
+                          dataKey="rpm"
+                          stroke="#00ff00"
+                          name="RPM"
+                        />
+                        <Line
+                          yAxisId="left"
+                          type="monotone"
+                          dataKey="temperature"
+                          stroke="#ff9800"
+                          name="Temperature (°C)"
+                        />
+                        <Line
+                          yAxisId="right"
+                          type="monotone"
+                          dataKey="load"
+                          stroke="#29b6f6"
+                          name="Load (%)"
+                        />
+                        <Line
+                          yAxisId="right"
+                          type="monotone"
+                          dataKey="exhaust_temp"
+                          stroke="#f44336"
+                          name="Exhaust Temp (°C)"
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </Box>
                 </CardContent>
               </Card>
             </Grid>
 
-            {/* MQTT Sensors Panel */}
-            <Grid item xs={12}>
-              <Card sx={{ 
-                borderRadius: 2,
-                boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
-              }}>
-                <CardHeader 
-                  title={
-                    <Typography variant="h6" sx={{ fontWeight: 500 }}>
-                      Sensor Data
-                    </Typography>
-                  }
-                />
-                <Divider />
+            {/* Auxiliary Systems */}
+            <Grid item xs={12} md={9}>
+              <Card sx={{ height: '100%', minHeight: 400 }}>
+                <CardHeader title="AUXILIARY SYSTEMS" />
                 <CardContent>
                   <Grid container spacing={3}>
-                    {Object.entries(mqttData).map(([sensor, data]) => (
-                      <Grid item xs={12} md={3} key={sensor}>
-                        <Paper 
-                          elevation={0} 
-                          sx={{ 
-                            p: 2, 
-                            borderRadius: 2,
-                            backgroundColor: '#f8f9fa',
-                            height: '100%'
-                          }}
-                        >
-                          <Typography 
-                            color="textSecondary" 
-                            gutterBottom
-                            sx={{ 
-                              fontSize: '0.875rem',
-                              textTransform: 'uppercase',
-                              letterSpacing: '0.1em'
-                            }}
-                          >
-                            {sensor.replace(/_/g, ' ')}
+                    {Object.entries(SENSOR_CONFIG).map(([key, config]) => (
+                      <Grid item xs={12} sm={6} md={3} key={key}>
+                        <Box sx={{ mb: 2 }}>
+                          <Typography variant="body2" color="textSecondary" gutterBottom>
+                            {key.split('_').map(word => word.toUpperCase()).join(' ')}
                           </Typography>
-                          <Typography 
-                            variant="h4" 
-                            sx={{ 
-                              fontWeight: 500,
-                              color: '#1a1a1a'
-                            }}
-                          >
-                            {data.value.toFixed(2)}
-                            <Typography 
-                              component="span" 
-                              sx={{ 
-                                fontSize: '1rem',
-                                color: '#666',
-                                ml: 1
+                          <Box sx={{ position: 'relative', height: 6, backgroundColor: '#404040', borderRadius: 3 }}>
+                            <Box
+                              sx={{
+                                position: 'absolute',
+                                height: '100%',
+                                width: `${(mqttData[key].value / config.max) * 100}%`,
+                                backgroundColor: mqttData[key].value >= config.critical ? '#ff0000' :
+                                                  mqttData[key].value >= config.warning ? '#ffff00' : '#00ff00',
+                                borderRadius: 3,
+                                transition: 'all 0.3s ease'
                               }}
-                            >
-                              {data.unit}
+                            />
+                          </Box>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
+                            <Typography variant="h6" sx={{ color: '#00ff00' }}>
+                              {mqttData[key].value.toFixed(1)}
                             </Typography>
-                          </Typography>
-                        </Paper>
+                            <Typography variant="body2" color="textSecondary">
+                              {config.unit}
+                            </Typography>
+                          </Box>
+                        </Box>
                       </Grid>
                     ))}
                   </Grid>
@@ -589,55 +629,97 @@ function App() {
               </Card>
             </Grid>
 
-            {/* Alarms Panel */}
-            <Grid item xs={12}>
-              <Card sx={{ 
-                borderRadius: 2,
-                boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
-              }}>
-                <CardHeader 
-                  title={
-                    <Typography variant="h6" sx={{ fontWeight: 500 }}>
-                      System Alerts
-                    </Typography>
-                  }
-                />
-                <Divider />
+            {/* System Parameters */}
+            <Grid item xs={12} md={3}>
+              <Card sx={{ height: '100%', minHeight: 400 }}>
+                <CardHeader title="SYSTEM PARAMETERS" />
                 <CardContent>
-                  {plcData.alarms.length > 0 ? (
-                    plcData.alarms.map((alarm, index) => (
+                  <Box sx={{ 
+                    '& .parameter-row': {
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      mb: 2,
+                      pb: 2,
+                      borderBottom: '1px solid #404040'
+                    }
+                  }}>
+                    <Box className="parameter-row">
+                      <Typography color="textSecondary">FUEL FLOW</Typography>
+                      <Typography sx={{ color: '#00ff00' }}>
+                        {engineData.fuel_flow.toFixed(2)} t/h
+                      </Typography>
+                    </Box>
+                    <Box className="parameter-row">
+                      <Typography color="textSecondary">LUBE OIL</Typography>
+                      <Typography sx={{ color: '#00ff00' }}>
+                        {mqttData.lube_oil_pressure.value.toFixed(1)} bar
+                      </Typography>
+                    </Box>
+                  </Box>
+                </CardContent>
+              </Card>
+            </Grid>
+
+            {/* Alarms and Warnings */}
+            <Grid item xs={12}>
+              <Card sx={{ height: '100%' }}>
+                <CardHeader 
+                  title="ALARMS & WARNINGS"
+                  sx={{
+                    '& .MuiCardHeader-title': {
+                      color: plcData.alarms.length > 0 ? '#ff0000' : '#00ff00'
+                    }
+                  }}
+                />
+                <CardContent>
+                  <Box sx={{ 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    gap: 1,
+                    maxHeight: 300,
+                    overflowY: 'auto'
+                  }}>
+                    {plcData.alarms.length > 0 ? (
+                      plcData.alarms.map((alarm, index) => (
+                        <Alert 
+                          key={index} 
+                          severity="error"
+                          sx={{ 
+                            backgroundColor: 'rgba(255, 0, 0, 0.1)',
+                            border: '1px solid #ff0000',
+                            color: '#ff0000',
+                            '& .MuiAlert-icon': {
+                              color: '#ff0000'
+                            }
+                          }}
+                        >
+                          {alarm}
+                        </Alert>
+                      ))
+                    ) : (
                       <Alert 
-                        severity="error" 
-                        key={index} 
+                        severity="success"
                         sx={{ 
-                          mb: 1,
-                          borderRadius: 1
+                          backgroundColor: 'rgba(0, 255, 0, 0.1)',
+                          border: '1px solid #00ff00',
+                          color: '#00ff00',
+                          '& .MuiAlert-icon': {
+                            color: '#00ff00'
+                          }
                         }}
                       >
-                        {alarm}
+                        NO ACTIVE ALARMS
                       </Alert>
-                    ))
-                  ) : (
-                    <Alert 
-                      severity="success"
-                      sx={{ borderRadius: 1 }}
-                    >
-                      All systems operating normally
-                    </Alert>
-                  )}
+                    )}
+                  </Box>
                 </CardContent>
               </Card>
             </Grid>
           </Grid>
-        ) : (
-          <TopologyView
-            engineData={engineData}
-            mqttData={mqttData}
-            plcData={plcData}
-          />
-        )}
-      </Container>
-    </Box>
+        </Container>
+      </Box>
+    </ThemeProvider>
   );
 }
 
