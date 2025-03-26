@@ -376,6 +376,37 @@ function App() {
               <Typography variant="h6" sx={{ flexGrow: 1 }}>
                 Engine Control System
               </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mr: 4 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <Box 
+                    className="status-indicator"
+                    sx={{ 
+                      width: 12,
+                      height: 12,
+                      borderRadius: '50%',
+                      backgroundColor: engineData.status === 1 ? '#00ff00' : '#ff0000',
+                      boxShadow: engineData.status === 1 ? '0 0 10px #00ff00' : '0 0 10px #ff0000',
+                      mr: 1
+                    }} 
+                  />
+                  <Typography variant="body2" sx={{ color: engineData.status === 1 ? '#00ff00' : '#ff0000' }}>
+                    {engineData.status === 1 ? 'ENGINE RUNNING' : 'ENGINE STOPPED'}
+                  </Typography>
+                </Box>
+                <Button 
+                  variant="contained" 
+                  color={engineData.status === 1 ? "error" : "primary"}
+                  size="large"
+                  onClick={() => sendCommand(engineData.status === 1 ? 'stop_engine' : 'start_engine')}
+                  sx={{ 
+                    minWidth: 150,
+                    height: 48,
+                    fontSize: '1rem'
+                  }}
+                >
+                  {engineData.status === 1 ? 'EMERGENCY STOP' : 'START ENGINE'}
+                </Button>
+              </Box>
               <Tabs value={currentTab} onChange={handleTabChange} textColor="inherit">
                 <Tab label="Dashboard" />
                 <Tab label="Topology" />
