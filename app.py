@@ -77,22 +77,23 @@ async def broadcast_state():
                 }
             }
             
-            # MQTT sensor data
-            mqtt_state = {
-                "type": "mqtt",
-                "timestamp": datetime.now().isoformat(),
-                "sensors": mqtt_sensor.generate_sensor_data()
-            }
-            
             for connection in current_connections:
                 try:
                     if connection not in connections:
                         continue
                     await connection.send_json(modbus_state)
-                    await asyncio.sleep(0.1)  # Small delay between messages
-                    if connection not in connections:
-                        continue
-                    await connection.send_json(mqtt_state)
+                    
+                    # Only send MQTT data if sensor is available
+                    if mqtt_sensor:
+                        await asyncio.sleep(0.1)  # Small delay between messages
+                        if connection not in connections:
+                            continue
+                        mqtt_state = {
+                            "type": "mqtt",
+                            "timestamp": datetime.now().isoformat(),
+                            "sensors": mqtt_sensor.generate_sensor_data()
+                        }
+                        await connection.send_json(mqtt_state)
                 except Exception as e:
                     print(f"Error broadcasting to client: {e}")
                     try:
@@ -110,24 +111,28 @@ async def startup_event():
     # Initialize components
     simulator = MainEngineSimulator()
     plc = PLCController(simulator)
-    mqtt_sensor = MQTTSensor()
     
     # Start Modbus server
     simulator.start_server()
     
-    # Start MQTT client
-    mqtt_sensor.start()
+    try:
+        # Initialize and start MQTT sensor (optional)
+        mqtt_sensor = MQTTSensor()
+        mqtt_sensor.start()
+        # Start MQTT publisher
+        asyncio.create_task(mqtt_sensor.publish_loop())
+    except Exception as e:
+        print(f"MQTT sensor initialization failed (non-critical): {e}")
+        mqtt_sensor = None
     
     # Start state broadcaster
     asyncio.create_task(broadcast_state())
-    
-    # Start MQTT publisher
-    asyncio.create_task(mqtt_sensor.publish_loop())
 
 @app.on_event("shutdown")
 async def shutdown_event():
     """Stop all components"""
-    mqtt_sensor.stop()
+    if mqtt_sensor:
+        mqtt_sensor.stop()
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):

@@ -1,8 +1,8 @@
 # Main Engine Simulation Configuration
 
 modbus:
-  host: "127.0.0.1"  # Local Modbus server
-  port: 502          # Standard Modbus TCP port
+  host: "localhost"   # Explicitly use localhost
+  port: 5020         # Using non-privileged port
 
 engine:
   # RPM ranges
