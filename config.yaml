@@ -1,8 +1,8 @@
 # Main Engine Simulation Configuration
 
 modbus:
-  host: "localhost"   # Explicitly use localhost
-  port: 5020         # Using non-privileged port
+  host: "0.0.0.0"    # WARNING: This makes the server accessible from any IP
+  port: 502          # Standard Modbus TCP port
 
 engine:
   # RPM ranges
@@ -23,10 +23,10 @@ engine:
   # Update interval (seconds)
   update_interval: 1.0
 
-# Modbus register mapping (using standard Modbus addresses)
+# WARNING: These registers are publicly accessible without authentication
 registers:
-  rpm: 40001        # Engine RPM
-  temp: 40002       # Engine Temperature
-  fuel_flow: 40003  # Fuel Flow Rate
-  load: 40004       # Engine Load
-  status: 40005     # Engine Status (0: Stopped, 1: Running, 2: Warning, 3: Alarm) 
+  status: 0          # 0: Stopped, 1: Running, 2: Warning, 3: Alarm
+  rpm: 1
+  temp: 2
+  fuel_flow: 3
+  load: 4 

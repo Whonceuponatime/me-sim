@@ -16,11 +16,12 @@ class MainEngineSimulator:
         with open(config_file, 'r') as f:
             self.config = yaml.safe_load(f)
         
-        # Initialize Modbus server
+        # Initialize Modbus server with logging
         self.server = ModbusServer(
             host=self.config['modbus']['host'],
             port=self.config['modbus']['port'],
-            no_block=True
+            no_block=True,
+            log_level="DEBUG"  # Enable debug logging
         )
         
         # Initialize Modbus client for explicit communication
@@ -37,6 +38,10 @@ class MainEngineSimulator:
         self.current_fuel_flow = 0
         self.current_load = 0
         self.status = 0  # 0: Stopped, 1: Running, 2: Warning, 3: Alarm
+        
+        # Security logging
+        self.last_access = {}
+        self.unauthorized_attempts = 0
         
     @property
     def running(self):
@@ -60,6 +65,9 @@ class MainEngineSimulator:
         try:
             self.server.start()
             print(f"Modbus server started on {self.config['modbus']['host']}:{self.config['modbus']['port']}")
+            print("WARNING: This is a proof of concept - Modbus server is running without authentication!")
+            print("Any client can send commands to control the engine.")
+            print("To demonstrate, use: modbus-cli -r 1 -w 0x00 0 -h <server_ip>")
             # Start simulation loop
             asyncio.create_task(self._simulation_loop())
             return True
@@ -145,4 +153,19 @@ class MainEngineSimulator:
         self.client.write_single_register(registers['temp'], int(self.current_temp))
         self.client.write_single_register(registers['fuel_flow'], int(self.current_fuel_flow * 100))
         self.client.write_single_register(registers['load'], self.current_load)
+        
+        # Log unauthorized access attempts
+        if self.status != 0 and self._running:  # If engine is running
+            try:
+                status_value = self.client.read_holding_registers(registers['status'], 1)[0]
+                if status_value == 0:  # If someone wrote 0 to status register
+                    print("\n[SECURITY ALERT] Unauthorized engine stop command detected!")
+                    print("This demonstrates a security vulnerability in Modbus TCP.")
+                    print("Any client can send commands without authentication.")
+                    self._running = False
+                    self.status = 0
+                    self.unauthorized_attempts += 1
+            except Exception as e:
+                print(f"Error reading status register: {e}")
+        
         self.client.write_single_register(registers['status'], self.status) 
