@@ -16,16 +16,22 @@ class MainEngineSimulator:
         with open(config_file, 'r') as f:
             self.config = yaml.safe_load(f)
         
-        # Initialize Modbus server with logging
+        # Initialize Modbus server
         self.server = ModbusServer(
             host=self.config['modbus']['host'],
             port=self.config['modbus']['port'],
-            no_block=True,
-            log_level="DEBUG"  # Enable debug logging
+            no_block=True
         )
         
         # Initialize Modbus client for explicit communication
         self.client = ModbusClient(
+            host=self.config['modbus']['host'],
+            port=self.config['modbus']['port'],
+            auto_open=True
+        )
+        
+        # Initialize separate client for status checking
+        self.status_client = ModbusClient(
             host=self.config['modbus']['host'],
             port=self.config['modbus']['port'],
             auto_open=True
@@ -43,6 +49,11 @@ class MainEngineSimulator:
         self.last_access = {}
         self.unauthorized_attempts = 0
         
+    def _update_status(self, new_status):
+        """Centralized method to update engine status"""
+        self.status = new_status
+        self.client.write_single_register(self.config['registers']['status'], new_status)
+        
     @property
     def running(self):
         return self._running
@@ -52,14 +63,10 @@ class MainEngineSimulator:
         print(f"Setting engine running state to: {value}")
         self._running = value
         if value:
-            self.status = 1
-            # Write running status to Modbus register
-            self.client.write_single_register(self.config['registers']['status'], 1)
+            self._update_status(1)
         else:
-            self.status = 0
-            # Write stopped status to Modbus register
-            self.client.write_single_register(self.config['registers']['status'], 0)
-        
+            self._update_status(0)
+            
     def start_server(self):
         """Start the Modbus server and simulation loop"""
         try:
@@ -94,8 +101,7 @@ class MainEngineSimulator:
                 self.current_temp - random.uniform(1, 2)
             )
             if self.current_rpm < 10:  # Engine fully stopped
-                self.status = 0
-                self.client.write_single_register(self.config['registers']['status'], 0)
+                self._update_status(0)
         else:
             # Engine is running/starting
             target_rpm = self.config['engine']['rpm_normal']
@@ -135,14 +141,11 @@ class MainEngineSimulator:
             
             # Update status based on parameters
             if self.current_temp > self.config['engine']['temp_max'] * 0.9:
-                self.status = 2  # Warning
-                self.client.write_single_register(self.config['registers']['status'], 2)
+                self._update_status(2)  # Warning
             elif self.current_temp > self.config['engine']['temp_max']:
-                self.status = 3  # Alarm
-                self.client.write_single_register(self.config['registers']['status'], 3)
+                self._update_status(3)  # Alarm
             else:
-                self.status = 1  # Running
-                self.client.write_single_register(self.config['registers']['status'], 1)
+                self._update_status(1)  # Running
 
     def update_modbus_registers(self):
         """Update Modbus registers with current engine parameters using explicit Modbus TCP communication"""
@@ -157,15 +160,16 @@ class MainEngineSimulator:
         # Log unauthorized access attempts
         if self.status != 0 and self._running:  # If engine is running
             try:
-                status_value = self.client.read_holding_registers(registers['status'], 1)[0]
-                if status_value == 0:  # If someone wrote 0 to status register
+                # Read the current value using the separate status client
+                status_value = self.status_client.read_holding_registers(registers['status'], 1)
+                if status_value and status_value[0] == 0 and self.status != 0:  # Only if external client modified it
                     print("\n[SECURITY ALERT] Unauthorized engine stop command detected!")
                     print("This demonstrates a security vulnerability in Modbus TCP.")
                     print("Any client can send commands without authentication.")
+                    print("To demonstrate this vulnerability, run from another terminal:")
+                    print(f"modbus-cli -r 1 -w 0x00 0 -h {self.config['modbus']['host']}")
                     self._running = False
-                    self.status = 0
+                    self._update_status(0)
                     self.unauthorized_attempts += 1
             except Exception as e:
-                print(f"Error reading status register: {e}")
-        
-        self.client.write_single_register(registers['status'], self.status) 
+                print(f"Error checking status register: {e}") 
