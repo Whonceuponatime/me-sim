@@ -112,6 +112,9 @@ async def startup_event():
     simulator = MainEngineSimulator()
     plc = PLCController(simulator)
     
+    # Connect simulator with PLC controller
+    simulator.set_plc_controller(plc)
+    
     # Start Modbus server
     simulator.start_server()
     

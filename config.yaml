@@ -1,7 +1,7 @@
 # Main Engine Simulation Configuration
 
 modbus:
-  host: "0.0.0.0"    # WARNING: This makes the server accessible from any IP
+  host: "0.0.0.0"    # WARNING: This makes the server accessible from any IP (like a real-world scenario)
   port: 502          # Standard Modbus TCP port
 
 engine:

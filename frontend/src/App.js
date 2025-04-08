@@ -12,6 +12,13 @@ import GaugeChart from 'react-gauge-chart';
 import AnimatedGauge from './components/AnimatedGauge';
 import TopologyView from './components/TopologyView';
 import logo from './assets/logo.png';
+import WarningIcon from '@mui/icons-material/Warning';
+import ErrorIcon from '@mui/icons-material/Error';
+import SecurityIcon from '@mui/icons-material/Security';
+import PowerSettingsNewIcon from '@mui/icons-material/PowerSettingsNew';
+import SpeedIcon from '@mui/icons-material/Speed';
+import ThermostatIcon from '@mui/icons-material/Thermostat';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 
 const WEBSOCKET_URL = 'ws://localhost:8000/ws';
 const RECONNECT_DELAY = 2000; // 2 seconds delay between reconnection attempts
@@ -362,6 +369,26 @@ function App() {
     );
   });
 
+  // Add alarm icon mapping
+  const getAlarmIcon = (alarm) => {
+    const alarmLower = alarm.toLowerCase();
+    if (alarmLower.includes('security') || alarmLower.includes('unauthorized')) {
+      return <SecurityIcon />;
+    } else if (alarmLower.includes('emergency') || alarmLower.includes('critical')) {
+      return <ErrorIcon />;
+    } else if (alarmLower.includes('warning')) {
+      return <WarningIcon />;
+    } else if (alarmLower.includes('power') || alarmLower.includes('engine')) {
+      return <PowerSettingsNewIcon />;
+    } else if (alarmLower.includes('speed') || alarmLower.includes('rpm')) {
+      return <SpeedIcon />;
+    } else if (alarmLower.includes('temp') || alarmLower.includes('temperature')) {
+      return <ThermostatIcon />;
+    } else {
+      return <WarningIcon />;
+    }
+  };
+
   return (
     <ThemeProvider theme={darkTheme}>
       <Box sx={{ 
@@ -506,6 +533,100 @@ function App() {
                         />
                       </Grid>
                     </Grid>
+
+                    {/* Engine Status Alarms */}
+                    <Box sx={{ mt: 4 }}>
+                      <Box sx={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: 1, 
+                        mb: 2,
+                        borderBottom: '1px solid #404040',
+                        pb: 1
+                      }}>
+                        {plcData.alarms.length > 0 ? 
+                          <ErrorIcon sx={{ color: '#ff0000' }} /> : 
+                          <CheckCircleIcon sx={{ color: '#00ff00' }} />
+                        }
+                        <Typography variant="subtitle1" sx={{ 
+                          color: plcData.alarms.length > 0 ? '#ff0000' : '#00ff00',
+                          fontWeight: 500
+                        }}>
+                          ENGINE ALARMS
+                        </Typography>
+                      </Box>
+                      <Box sx={{ 
+                        display: 'flex', 
+                        flexDirection: 'column', 
+                        gap: 1,
+                        maxHeight: 150,
+                        overflowY: 'auto'
+                      }}>
+                        {plcData.alarms.length > 0 ? (
+                          plcData.alarms.slice(0, 3).map((alarm, index) => (
+                            <Box
+                              key={index}
+                              sx={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 1,
+                                p: 1,
+                                backgroundColor: 'rgba(255, 0, 0, 0.1)',
+                                border: '1px solid #ff0000',
+                                borderRadius: 1
+                              }}
+                            >
+                              {getAlarmIcon(alarm)}
+                              <Typography 
+                                variant="body2" 
+                                sx={{ 
+                                  color: '#ff0000',
+                                  fontWeight: 500,
+                                  flex: 1
+                                }}
+                              >
+                                {alarm}
+                              </Typography>
+                            </Box>
+                          ))
+                        ) : (
+                          <Box
+                            sx={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 1,
+                              p: 1,
+                              backgroundColor: 'rgba(0, 255, 0, 0.1)',
+                              border: '1px solid #00ff00',
+                              borderRadius: 1
+                            }}
+                          >
+                            <CheckCircleIcon sx={{ color: '#00ff00' }} />
+                            <Typography 
+                              variant="body2" 
+                              sx={{ 
+                                color: '#00ff00',
+                                fontWeight: 500
+                              }}
+                            >
+                              NO ACTIVE ALARMS
+                            </Typography>
+                          </Box>
+                        )}
+                        {plcData.alarms.length > 3 && (
+                          <Typography 
+                            variant="body2" 
+                            sx={{ 
+                              color: '#ff0000',
+                              textAlign: 'center',
+                              mt: 1
+                            }}
+                          >
+                            +{plcData.alarms.length - 3} more alarms
+                          </Typography>
+                        )}
+                      </Box>
+                    </Box>
                   </CardContent>
                 </Card>
               </Grid>
@@ -655,12 +776,14 @@ function App() {
               <Grid item xs={12}>
                 <Card sx={{ height: '100%' }}>
                   <CardHeader 
-                    title="ALARMS & WARNINGS"
-                    sx={{
-                      '& .MuiCardHeader-title': {
-                        color: plcData.alarms.length > 0 ? '#ff0000' : '#00ff00'
-                      }
-                    }}
+                    title={
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        {plcData.alarms.length > 0 ? <ErrorIcon sx={{ color: '#ff0000' }} /> : <CheckCircleIcon sx={{ color: '#00ff00' }} />}
+                        <Typography variant="h6" sx={{ color: plcData.alarms.length > 0 ? '#ff0000' : '#00ff00' }}>
+                          ALARMS & WARNINGS
+                        </Typography>
+                      </Box>
+                    }
                   />
                   <CardContent>
                     <Box sx={{ 
@@ -674,32 +797,46 @@ function App() {
                         plcData.alarms.map((alarm, index) => (
                           <Alert 
                             key={index} 
+                            icon={getAlarmIcon(alarm)}
                             severity="error"
                             sx={{ 
                               backgroundColor: 'rgba(255, 0, 0, 0.1)',
                               border: '1px solid #ff0000',
                               color: '#ff0000',
                               '& .MuiAlert-icon': {
-                                color: '#ff0000'
-                              }
+                                color: '#ff0000',
+                                fontSize: '1.5rem'
+                              },
+                              display: 'flex',
+                              alignItems: 'center',
+                              py: 1
                             }}
                           >
-                            {alarm}
+                            <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                              {alarm}
+                            </Typography>
                           </Alert>
                         ))
                       ) : (
                         <Alert 
+                          icon={<CheckCircleIcon />}
                           severity="success"
                           sx={{ 
                             backgroundColor: 'rgba(0, 255, 0, 0.1)',
                             border: '1px solid #00ff00',
                             color: '#00ff00',
                             '& .MuiAlert-icon': {
-                              color: '#00ff00'
-                            }
+                              color: '#00ff00',
+                              fontSize: '1.5rem'
+                            },
+                            display: 'flex',
+                            alignItems: 'center',
+                            py: 1
                           }}
                         >
-                          NO ACTIVE ALARMS
+                          <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                            NO ACTIVE ALARMS
+                          </Typography>
                         </Alert>
                       )}
                     </Box>

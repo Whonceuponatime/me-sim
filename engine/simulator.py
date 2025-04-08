@@ -51,8 +51,10 @@ class MainEngineSimulator:
         
     def _update_status(self, new_status):
         """Centralized method to update engine status"""
-        self.status = new_status
-        self.client.write_single_register(self.config['registers']['status'], new_status)
+        # Only allow status changes if engine is running or being stopped
+        if new_status == 0 or self._running:
+            self.status = new_status
+            self.server.data_bank.set_holding_registers(self.config['registers']['status'], [new_status])
         
     @property
     def running(self):
@@ -60,12 +62,23 @@ class MainEngineSimulator:
         
     @running.setter
     def running(self, value):
+        """Set engine running state and handle status changes"""
         print(f"Setting engine running state to: {value}")
         self._running = value
         if value:
             self._update_status(1)
+            print("[ENGINE STARTED] Engine is now running")
         else:
             self._update_status(0)
+            print("[ENGINE STOPPING] Engine shutdown initiated")
+            print("[ALARM] Engine shutdown alarm triggered")
+            # Reset parameters to initial values
+            self.current_rpm = 0
+            self.current_temp = self.config['engine']['temp_min']
+            self.current_fuel_flow = 0
+            self.current_load = 0
+            # Force update registers
+            self.update_modbus_registers()
             
     def start_server(self):
         """Start the Modbus server and simulation loop"""
@@ -93,15 +106,24 @@ class MainEngineSimulator:
     def calculate_engine_parameters(self):
         """Calculate realistic engine parameters based on current state"""
         if not self._running:
-            # Engine is stopping
+            # Engine is stopping - gradually decrease all parameters
             self.current_rpm = max(0, self.current_rpm - random.uniform(50, 100))
             self.current_fuel_flow = max(0, self.current_fuel_flow - random.uniform(0.1, 0.2))
             self.current_temp = max(
                 self.config['engine']['temp_min'],
                 self.current_temp - random.uniform(1, 2)
             )
-            if self.current_rpm < 10:  # Engine fully stopped
+            self.current_load = max(0, self.current_load - random.uniform(5, 10))
+            
+            # When engine fully stops, set all parameters to zero
+            if self.current_rpm < 10:
+                self.current_rpm = 0
+                self.current_fuel_flow = 0
+                self.current_load = 0
                 self._update_status(0)
+                print("\n[ENGINE STOPPED] Engine has been shut down")
+                print("All parameters have been reset to zero")
+                print("Alarms have been triggered")
         else:
             # Engine is running/starting
             target_rpm = self.config['engine']['rpm_normal']
@@ -148,28 +170,57 @@ class MainEngineSimulator:
                 self._update_status(1)  # Running
 
     def update_modbus_registers(self):
-        """Update Modbus registers with current engine parameters using explicit Modbus TCP communication"""
+        """Update Modbus registers with current engine parameters"""
         registers = self.config['registers']
         
-        # Write values to Modbus registers using client
-        self.client.write_single_register(registers['rpm'], int(self.current_rpm))
-        self.client.write_single_register(registers['temp'], int(self.current_temp))
-        self.client.write_single_register(registers['fuel_flow'], int(self.current_fuel_flow * 100))
-        self.client.write_single_register(registers['load'], self.current_load)
+        # Check if status register was changed externally
+        try:
+            status_value = self.server.data_bank.get_holding_registers(registers['status'], 1)
+            if status_value and status_value[0] == 0 and self._running:
+                print("\n" + "!"*80)
+                print("!"*80)
+                print("!"*80)
+                print("!!! SECURITY BREACH DETECTED !!!")
+                print("!"*80)
+                print("!"*80)
+                print("!"*80)
+                
+                # Set engine to emergency stop
+                self._running = False
+                self.current_rpm = 0
+                self.current_temp = self.config['engine']['temp_min']
+                self.current_fuel_flow = 0
+                self.current_load = 0
+                self.status = 0
+                self.unauthorized_attempts += 1
+                
+                # Force update registers
+                self.server.data_bank.set_holding_registers(registers['rpm'], [0])
+                self.server.data_bank.set_holding_registers(registers['temp'], [int(self.config['engine']['temp_min'])])
+                self.server.data_bank.set_holding_registers(registers['fuel_flow'], [0])
+                self.server.data_bank.set_holding_registers(registers['load'], [0])
+                self.server.data_bank.set_holding_registers(registers['status'], [0])
+                
+                # Add security alarms to PLC
+                if hasattr(self, 'plc_controller'):
+                    self.plc_controller.alarms.extend([
+                        "SECURITY_BREACH",
+                        "UNAUTHORIZED_ACCESS",
+                        "SYSTEM_COMPROMISE",
+                        "CRITICAL_FAILURE",
+                        "EMERGENCY_STOP"
+                    ])
+                    self.plc_controller.set_mode("EMERGENCY")
+        except Exception as e:
+            print(f"Error checking status register: {e}")
         
-        # Log unauthorized access attempts
-        if self.status != 0 and self._running:  # If engine is running
-            try:
-                # Read the current value using the separate status client
-                status_value = self.status_client.read_holding_registers(registers['status'], 1)
-                if status_value and status_value[0] == 0 and self.status != 0:  # Only if external client modified it
-                    print("\n[SECURITY ALERT] Unauthorized engine stop command detected!")
-                    print("This demonstrates a security vulnerability in Modbus TCP.")
-                    print("Any client can send commands without authentication.")
-                    print("To demonstrate this vulnerability, run from another terminal:")
-                    print(f"modbus-cli -r 1 -w 0x00 0 -h {self.config['modbus']['host']}")
-                    self._running = False
-                    self._update_status(0)
-                    self.unauthorized_attempts += 1
-            except Exception as e:
-                print(f"Error checking status register: {e}") 
+        # Write values directly to server registers
+        self.server.data_bank.set_holding_registers(registers['rpm'], [int(self.current_rpm)])
+        self.server.data_bank.set_holding_registers(registers['temp'], [int(self.current_temp)])
+        self.server.data_bank.set_holding_registers(registers['fuel_flow'], [int(self.current_fuel_flow * 100)])
+        self.server.data_bank.set_holding_registers(registers['load'], [self.current_load])
+        self.server.data_bank.set_holding_registers(registers['status'], [self.status])
+        
+    def set_plc_controller(self, plc_controller):
+        """Set the PLC controller reference"""
+        self.plc_controller = plc_controller 
