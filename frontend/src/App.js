@@ -11,6 +11,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsi
 import GaugeChart from 'react-gauge-chart';
 import AnimatedGauge from './components/AnimatedGauge';
 import TopologyView from './components/TopologyView';
+import SettingsPage from './components/SettingsPage';
 import logo from './assets/logo.png';
 import WarningIcon from '@mui/icons-material/Warning';
 import ErrorIcon from '@mui/icons-material/Error';
@@ -20,23 +21,38 @@ import SpeedIcon from '@mui/icons-material/Speed';
 import ThermostatIcon from '@mui/icons-material/Thermostat';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 
-const WEBSOCKET_URL = 'ws://localhost:8000/ws';
-const RECONNECT_DELAY = 2000; // 2 seconds delay between reconnection attempts
-const MAX_RECONNECT_ATTEMPTS = 5;
-
-// Add engine configuration constants
-const ENGINE_CONFIG = {
-  rpm_max: 2000,
-  rpm_min: 0,
-  temp_max: 95,
-  temp_min: 20,
-  temp_warning: 75,
-  temp_critical: 85,
-  fuel_flow_max: 5.0,
-  fuel_flow_min: 0,
-  load_warning: 80,
-  load_critical: 90
+// Default settings - will be overridden by saved settings
+const DEFAULT_SETTINGS = {
+  websocketUrl: 'ws://localhost:8000/ws',
+  modbusHost: '127.0.0.1',
+  modbusPort: 502,
+  reconnectDelay: 2000,
+  maxReconnectAttempts: 5,
+  rpmMin: 600,
+  rpmMax: 1200,
+  rpmNormal: 900,
+  tempMin: 70,
+  tempMax: 120,
+  tempNormal: 85,
+  tempWarning: 90,
+  tempCritical: 105,
+  fuelFlowMin: 0.5,
+  fuelFlowMax: 2.5,
+  fuelFlowNormal: 1.5,
+  updateInterval: 1.0,
+  chartUpdateInterval: 1000,
+  maxHistoryPoints: 50,
+  darkMode: true,
+  showDebugInfo: false,
+  enableSounds: false,
+  enableAlarmFlashing: true,
+  gaugeAnimationSpeed: 300,
+  enableSecurityLogging: true,
+  maxUnauthorizedAttempts: 3,
+  securityAlertLevel: 'high'
 };
+
+// Engine configuration will be dynamically set from settings
 
 // Add sensor configuration constants
 const SENSOR_CONFIG = {
@@ -121,6 +137,18 @@ function TabPanel({ children, value, index }) {
 
 function App() {
   const [currentTab, setCurrentTab] = useState(0);
+  
+  // Load settings from localStorage or use defaults
+  const [settings, setSettings] = useState(() => {
+    try {
+      const savedSettings = localStorage.getItem('engineSettings');
+      return savedSettings ? { ...DEFAULT_SETTINGS, ...JSON.parse(savedSettings) } : DEFAULT_SETTINGS;
+    } catch (error) {
+      console.error('Error loading settings:', error);
+      return DEFAULT_SETTINGS;
+    }
+  });
+
   const [engineData, setEngineData] = useState({
     rpm: 0,
     temperature: 0,
@@ -149,33 +177,50 @@ function App() {
   const reconnectAttempts = useRef(0);
   const reconnectTimeout = useRef(null);
 
+  // Settings change handler
+  const handleSettingsChange = useCallback((newSettings) => {
+    setSettings(newSettings);
+    localStorage.setItem('engineSettings', JSON.stringify(newSettings));
+    
+    // Reconnect WebSocket if URL changed
+    if (newSettings.websocketUrl !== settings.websocketUrl) {
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
+      // Small delay to allow cleanup - we'll trigger reconnection via useEffect
+      setTimeout(() => {
+        setWsConnected(false);
+      }, 100);
+    }
+  }, [settings.websocketUrl]);
+
   // Memoize the gauge values to prevent unnecessary re-renders
   const gaugeValues = useMemo(() => ({
     rpm: {
       value: engineData.rpm,
-      normalized: engineData.rpm / ENGINE_CONFIG.rpm_max
+      normalized: engineData.rpm / settings.rpmMax
     },
     temperature: {
       value: engineData.temperature,
-      normalized: (engineData.temperature - ENGINE_CONFIG.temp_min) / 
-                 (ENGINE_CONFIG.temp_max - ENGINE_CONFIG.temp_min)
+      normalized: (engineData.temperature - settings.tempMin) / 
+                 (settings.tempMax - settings.tempMin)
     },
     fuelFlow: {
       value: engineData.fuel_flow,
-      normalized: engineData.fuel_flow / ENGINE_CONFIG.fuel_flow_max
+      normalized: engineData.fuel_flow / settings.fuelFlowMax
     },
     load: {
       value: engineData.load,
       normalized: engineData.load / 100
     }
-  }), [engineData]);
+  }), [engineData, settings]);
 
   const connectWebSocket = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
 
     try {
-      console.log('Attempting to connect to WebSocket...');
-      const ws = new WebSocket(WEBSOCKET_URL);
+      console.log(`Attempting to connect to WebSocket at ${settings.websocketUrl}...`);
+      const ws = new WebSocket(settings.websocketUrl);
       wsRef.current = ws;
 
       ws.onopen = () => {
@@ -194,12 +239,12 @@ function App() {
         }
 
         // Attempt to reconnect if we haven't exceeded max attempts
-        if (reconnectAttempts.current < MAX_RECONNECT_ATTEMPTS) {
-          console.log(`Attempting to reconnect... (${reconnectAttempts.current + 1}/${MAX_RECONNECT_ATTEMPTS})`);
+        if (reconnectAttempts.current < settings.maxReconnectAttempts) {
+          console.log(`Attempting to reconnect... (${reconnectAttempts.current + 1}/${settings.maxReconnectAttempts})`);
           reconnectTimeout.current = setTimeout(() => {
             reconnectAttempts.current += 1;
             connectWebSocket();
-          }, RECONNECT_DELAY);
+          }, settings.reconnectDelay);
         } else {
           console.error('Max reconnection attempts reached. Please refresh the page.');
         }
@@ -235,7 +280,7 @@ function App() {
               return {
                 ...prevData,
                 ...data.engine,
-                history: [...prevData.history, newHistoryPoint].slice(-50)
+                history: [...prevData.history, newHistoryPoint].slice(-settings.maxHistoryPoints)
               };
             });
 
@@ -279,11 +324,11 @@ function App() {
       // Attempt to reconnect after delay
       reconnectTimeout.current = setTimeout(() => {
         connectWebSocket();
-      }, RECONNECT_DELAY);
+      }, settings.reconnectDelay);
     }
-  }, []);
+  }, [settings.websocketUrl, settings.reconnectDelay, settings.maxReconnectAttempts]);
 
-  // Cleanup on component unmount
+  // Handle WebSocket connection and reconnection
   useEffect(() => {
     connectWebSocket();
     return () => {
@@ -296,6 +341,13 @@ function App() {
       }
     };
   }, [connectWebSocket]);
+
+  // Handle settings changes that require reconnection
+  useEffect(() => {
+    if (!wsConnected && wsRef.current?.readyState !== WebSocket.CONNECTING) {
+      connectWebSocket();
+    }
+  }, [wsConnected, connectWebSocket]);
 
   const sendCommand = useCallback((command, data = {}) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -391,13 +443,13 @@ function App() {
 
   return (
     <ThemeProvider theme={darkTheme}>
-      <Box sx={{ 
-        minHeight: '100vh',
+    <Box sx={{ 
+      minHeight: '100vh',
         backgroundColor: '#1a1a1a',
         pt: 2
-      }}>
+    }}>
         <AppBar position="static" sx={{ backgroundColor: '#1a1a1a', mb: 3 }}>
-          <Toolbar>
+        <Toolbar>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexGrow: 1 }}>
               <img src={logo} alt="Engine Control System Logo" style={{ height: 40 }} />
               <Typography variant="h6" sx={{ flexGrow: 1 }}>
@@ -420,28 +472,29 @@ function App() {
                     {engineData.status === 1 ? 'ENGINE RUNNING' : 'ENGINE STOPPED'}
                   </Typography>
                 </Box>
-                <Button 
-                  variant="contained" 
+              <Button 
+                variant="contained" 
                   color={engineData.status === 1 ? "error" : "primary"}
-                  size="large"
+                size="large"
                   onClick={() => sendCommand(engineData.status === 1 ? 'stop_engine' : 'start_engine')}
-                  sx={{ 
+                sx={{ 
                     minWidth: 150,
                     height: 48,
                     fontSize: '1rem'
                   }}
                 >
                   {engineData.status === 1 ? 'EMERGENCY STOP' : 'START ENGINE'}
-                </Button>
+              </Button>
               </Box>
               <Tabs value={currentTab} onChange={handleTabChange} textColor="inherit">
                 <Tab label="Dashboard" />
                 <Tab label="Topology" />
                 <Tab label="Trends" />
+                <Tab label="Settings" />
               </Tabs>
-            </Box>
-          </Toolbar>
-        </AppBar>
+          </Box>
+        </Toolbar>
+      </AppBar>
 
         {!wsConnected && (
           <Alert severity="error" sx={{ mb: 3 }}>
@@ -460,7 +513,7 @@ function App() {
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                         <Typography variant="h6">ENGINE STATUS</Typography>
                         <Box 
-                          sx={{ 
+            sx={{ 
                             width: 10, 
                             height: 10, 
                             borderRadius: '50%',
@@ -488,7 +541,7 @@ function App() {
                         <AnimatedGauge
                           id="rpm-gauge"
                           value={engineData.rpm}
-                          normalizedValue={engineData.rpm / ENGINE_CONFIG.rpm_max}
+                          normalizedValue={gaugeValues.rpm.normalized}
                           label="RPM"
                           formatValue={(value) => `${value.toFixed(0)} RPM`}
                           colors={['#00ff00', '#ffff00', '#ff0000']}
@@ -505,7 +558,7 @@ function App() {
                         <AnimatedGauge
                           id="temp-gauge"
                           value={engineData.temperature}
-                          normalizedValue={engineData.temperature / ENGINE_CONFIG.temp_max}
+                          normalizedValue={gaugeValues.temperature.normalized}
                           label="TEMPERATURE"
                           formatValue={(value) => `${value.toFixed(1)}°C`}
                           colors={['#00ff00', '#ffff00', '#ff0000']}
@@ -518,11 +571,11 @@ function App() {
                       <Grid item xs={4}>
                         <Box sx={{ textAlign: 'center', mb: 1 }}>
                           <Typography variant="h6" sx={{ color: 'textSecondary' }}>ENGINE LOAD</Typography>
-                        </Box>
+        </Box>
                         <AnimatedGauge
                           id="load-gauge"
                           value={engineData.load}
-                          normalizedValue={engineData.load / 100}
+                          normalizedValue={gaugeValues.load.normalized}
                           label="LOAD"
                           formatValue={(value) => `${value.toFixed(0)}%`}
                           colors={['#00ff00', '#ffff00', '#ff0000']}
@@ -556,7 +609,7 @@ function App() {
                         </Typography>
                       </Box>
                       <Box sx={{ 
-                        display: 'flex', 
+                        display: 'flex',
                         flexDirection: 'column', 
                         gap: 1,
                         maxHeight: 150,
@@ -577,23 +630,23 @@ function App() {
                               }}
                             >
                               {getAlarmIcon(alarm)}
-                              <Typography 
+                        <Typography 
                                 variant="body2" 
-                                sx={{ 
+                          sx={{ 
                                   color: '#ff0000',
-                                  fontWeight: 500,
+                            fontWeight: 500,
                                   flex: 1
-                                }}
-                              >
+                          }}
+                        >
                                 {alarm}
-                              </Typography>
+                        </Typography>
                             </Box>
                           ))
                         ) : (
                           <Box
                             sx={{
-                              display: 'flex',
-                              alignItems: 'center',
+                          display: 'flex',
+                          alignItems: 'center',
                               gap: 1,
                               p: 1,
                               backgroundColor: 'rgba(0, 255, 0, 0.1)',
@@ -626,19 +679,19 @@ function App() {
                           </Typography>
                         )}
                       </Box>
-                    </Box>
-                  </CardContent>
-                </Card>
-              </Grid>
+                        </Box>
+                      </CardContent>
+                    </Card>
+            </Grid>
 
               {/* Performance Trends */}
-              <Grid item xs={12} md={6}>
+            <Grid item xs={12} md={6}>
                 <Card>
                   <CardHeader title="PERFORMANCE TRENDS" />
-                  <CardContent>
+                <CardContent>
                     <Box sx={{ height: 400 }}>
                       <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={engineData.history}>
+                    <LineChart data={engineData.history}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#404040" />
                           <XAxis 
                             dataKey="time" 
@@ -656,20 +709,20 @@ function App() {
                             stroke="#b0b0b0"
                             tick={{ fill: '#b0b0b0' }}
                           />
-                          <Tooltip 
-                            contentStyle={{ 
+                      <Tooltip 
+                        contentStyle={{ 
                               backgroundColor: '#2d2d2d',
                               border: '1px solid #404040',
                               borderRadius: 8
-                            }}
-                          />
-                          <Legend />
-                          <Line
-                            yAxisId="left"
-                            type="monotone"
-                            dataKey="rpm"
+                        }}
+                      />
+                      <Legend />
+                      <Line 
+                        yAxisId="left"
+                        type="monotone" 
+                        dataKey="rpm" 
                             stroke="#00ff00"
-                            name="RPM"
+                        name="RPM"
                           />
                           <Line
                             yAxisId="left"
@@ -677,34 +730,34 @@ function App() {
                             dataKey="temperature"
                             stroke="#ff9800"
                             name="Temperature (°C)"
-                          />
-                          <Line
-                            yAxisId="right"
-                            type="monotone"
-                            dataKey="load"
+                      />
+                      <Line 
+                        yAxisId="right"
+                        type="monotone" 
+                        dataKey="load" 
                             stroke="#29b6f6"
                             name="Load (%)"
-                          />
-                          <Line
+                      />
+                      <Line 
                             yAxisId="right"
-                            type="monotone"
-                            dataKey="exhaust_temp"
+                        type="monotone" 
+                        dataKey="exhaust_temp" 
                             stroke="#f44336"
                             name="Exhaust Temp (°C)"
-                          />
-                        </LineChart>
-                      </ResponsiveContainer>
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
                     </Box>
-                  </CardContent>
-                </Card>
-              </Grid>
+                </CardContent>
+              </Card>
+            </Grid>
 
               {/* Auxiliary Systems */}
               <Grid item xs={12} md={9}>
                 <Card sx={{ height: '100%', minHeight: 400 }}>
                   <CardHeader title="AUXILIARY SYSTEMS" />
-                  <CardContent>
-                    <Grid container spacing={3}>
+                <CardContent>
+                  <Grid container spacing={3}>
                       {Object.entries(SENSOR_CONFIG).map(([key, config]) => (
                         <Grid item xs={12} sm={6} md={3} key={key}>
                           <Box sx={{ mb: 2 }}>
@@ -730,15 +783,15 @@ function App() {
                               </Typography>
                               <Typography variant="body2" color="textSecondary">
                                 {config.unit}
-                              </Typography>
+                          </Typography>
                             </Box>
                           </Box>
-                        </Grid>
-                      ))}
-                    </Grid>
-                  </CardContent>
-                </Card>
-              </Grid>
+                      </Grid>
+                    ))}
+                  </Grid>
+                </CardContent>
+              </Card>
+            </Grid>
 
               {/* System Parameters */}
               <Grid item xs={12} md={3}>
@@ -773,19 +826,19 @@ function App() {
               </Grid>
 
               {/* Alarms and Warnings */}
-              <Grid item xs={12}>
+            <Grid item xs={12}>
                 <Card sx={{ height: '100%' }}>
-                  <CardHeader 
-                    title={
+                <CardHeader 
+                  title={
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         {plcData.alarms.length > 0 ? <ErrorIcon sx={{ color: '#ff0000' }} /> : <CheckCircleIcon sx={{ color: '#00ff00' }} />}
                         <Typography variant="h6" sx={{ color: plcData.alarms.length > 0 ? '#ff0000' : '#00ff00' }}>
                           ALARMS & WARNINGS
-                        </Typography>
+                    </Typography>
                       </Box>
-                    }
-                  />
-                  <CardContent>
+                  }
+                />
+                <CardContent>
                     <Box sx={{ 
                       display: 'flex', 
                       flexDirection: 'column', 
@@ -793,13 +846,13 @@ function App() {
                       maxHeight: 300,
                       overflowY: 'auto'
                     }}>
-                      {plcData.alarms.length > 0 ? (
-                        plcData.alarms.map((alarm, index) => (
-                          <Alert 
+                  {plcData.alarms.length > 0 ? (
+                    plcData.alarms.map((alarm, index) => (
+                      <Alert 
                             key={index} 
                             icon={getAlarmIcon(alarm)}
-                            severity="error"
-                            sx={{ 
+                        severity="error" 
+                        sx={{ 
                               backgroundColor: 'rgba(255, 0, 0, 0.1)',
                               border: '1px solid #ff0000',
                               color: '#ff0000',
@@ -813,14 +866,14 @@ function App() {
                             }}
                           >
                             <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                              {alarm}
+                        {alarm}
                             </Typography>
-                          </Alert>
-                        ))
-                      ) : (
-                        <Alert 
+                      </Alert>
+                    ))
+                  ) : (
+                    <Alert 
                           icon={<CheckCircleIcon />}
-                          severity="success"
+                      severity="success"
                           sx={{ 
                             backgroundColor: 'rgba(0, 255, 0, 0.1)',
                             border: '1px solid #00ff00',
@@ -837,22 +890,22 @@ function App() {
                           <Typography variant="body1" sx={{ fontWeight: 500 }}>
                             NO ACTIVE ALARMS
                           </Typography>
-                        </Alert>
-                      )}
+                    </Alert>
+                  )}
                     </Box>
-                  </CardContent>
-                </Card>
-              </Grid>
+                </CardContent>
+              </Card>
             </Grid>
+          </Grid>
           )}
           
           {currentTab === 1 && (
-            <TopologyView 
-              engineData={engineData}
-              mqttData={mqttData}
-              plcData={plcData}
-            />
-          )}
+          <TopologyView
+            engineData={engineData}
+            mqttData={mqttData}
+            plcData={plcData}
+          />
+        )}
           
           {currentTab === 2 && (
             // Trends content
@@ -860,8 +913,15 @@ function App() {
               {/* ... existing trends content ... */}
             </Grid>
           )}
-        </Container>
-      </Box>
+          
+                     {currentTab === 3 && (
+             <SettingsPage
+               onSettingsChange={handleSettingsChange}
+               currentSettings={settings}
+             />
+           )}
+      </Container>
+    </Box>
     </ThemeProvider>
   );
 }
