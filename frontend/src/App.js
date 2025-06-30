@@ -23,8 +23,8 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 
 // Default settings - will be overridden by saved settings
 const DEFAULT_SETTINGS = {
-  websocketUrl: 'ws://localhost:8000/ws',
-  modbusHost: '127.0.0.1',
+  websocketUrl: 'ws://192.168.0.175:8000/ws',
+  modbusHost: '192.168.0.175',
   modbusPort: 502,
   reconnectDelay: 2000,
   maxReconnectAttempts: 5,

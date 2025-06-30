@@ -108,29 +108,46 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="ME Simulator", lifespan=lifespan)
 
-# Define allowed origins
+# Define allowed origins - Add your network IPs here
 origins = [
+    # Local development
     "http://localhost:3000",
     "http://127.0.0.1:3000",
-    "http://192.168.0.35:3000",
     "http://0.0.0.0:3000",
-    # Allow WebSocket connections
+    
+    # Common private network ranges (192.168.x.x)
+    "http://192.168.1.*:3000",
+    "http://192.168.0.*:3000", 
+    "http://192.168.2.*:3000",
+    
+    # Common private network ranges (10.x.x.x)
+    "http://10.*.*.*:3000",
+    
+    # WebSocket connections
     "ws://localhost:8000",
     "ws://127.0.0.1:8000",
-    "ws://192.168.0.35:8000",
     "ws://0.0.0.0:8000",
-    # Allow backend URLs
+    "ws://192.168.1.*:8000",
+    "ws://192.168.0.*:8000",
+    "ws://192.168.2.*:8000", 
+    "ws://10.*.*.*:8000",
+    
+    # Backend URLs
     "http://localhost:8000",
     "http://127.0.0.1:8000",
-    "http://192.168.0.35:8000",
-    "http://0.0.0.0:8000"
+    "http://0.0.0.0:8000",
+    "http://192.168.1.*:8000",
+    "http://192.168.0.*:8000",
+    "http://192.168.2.*:8000",
+    "http://10.*.*.*:8000"
 ]
 
-# CORS middleware with explicit origins
+# CORS middleware - Allow all origins for development/demo
+# For production, replace "*" with specific origins list
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
+    allow_origins=["*"],  # Allow all origins for cross-machine access
+    allow_credentials=False,  # Must be False when allow_origins=["*"]
     allow_methods=["GET", "POST", "OPTIONS", "PATCH", "DELETE"],
     allow_headers=["*"],
     expose_headers=["*"]
