@@ -150,8 +150,41 @@ Make sure the following ports are open on the host machine:
 - **"Start Engine" button doesn't work**: Usually indicates WebSocket connection failure
 - **Connection lost alerts**: Check firewall settings and network connectivity
 - **Frontend loads but no data**: Verify backend is running and ports are accessible
+- **Engine starts but RPM doesn't change**: Simulation loop issue
 
-Use browser developer tools (F12) → Console to check for WebSocket connection errors.
+**Diagnostic Steps:**
+
+1. **Debug Startup** (recommended first step):
+   ```bash
+   python debug_start.py
+   ```
+   This starts the backend with enhanced debugging and shows exactly what's happening.
+
+2. **Test Backend Only** (isolate the issue):
+   ```bash
+   python test_backend.py
+   ```
+   This will test the backend simulation without the frontend.
+
+3. **Check Browser Console** (F12 → Console) for WebSocket errors
+
+4. **Look for Debug Messages** in backend output:
+   - `✓ Simulation loop started successfully!` - Loop initialization
+   - `[SIM] Loop X: Running=True, RPM=XXX` - Simulation running
+   - `[BROADCAST] Sending to X clients` - Data being sent to frontend
+
+5. **Verify Network Connectivity**:
+   ```bash
+   # Test if backend is reachable
+   curl http://[HOST_IP]:8000/api/status
+   ```
+
+**Common Issues and Solutions:**
+
+- **Simulation loop not starting**: The debug startup will show if this is the issue
+- **Parameters not updating**: Look for `[SIM] Engine starting` messages
+- **Frontend not receiving data**: Check for `[BROADCAST]` messages
+- **WebSocket connection fails**: Usually firewall or network configuration
 
 ## Components
 

@@ -81,26 +81,36 @@ class MainEngineSimulator:
             self.update_modbus_registers()
             
     def start_server(self):
-        """Start the Modbus server and simulation loop"""
+        """Start the Modbus server and return task for simulation loop"""
         try:
             self.server.start()
             print(f"Modbus server started on {self.config['modbus']['host']}:{self.config['modbus']['port']}")
             print("WARNING: This is a proof of concept - Modbus server is running without authentication!")
             print("Any client can send commands to control the engine.")
             print("To demonstrate, use: modbus-cli -r 1 -w 0x00 0 -h <server_ip>")
-            # Start simulation loop
-            asyncio.create_task(self._simulation_loop())
             return True
         except Exception as e:
             print(f"Error starting Modbus server: {e}")
             return False
+    
+    async def start_simulation_loop(self):
+        """Start the simulation loop - to be called from async context"""
+        print("Starting simulation loop...")
+        asyncio.create_task(self._simulation_loop())
             
     async def _simulation_loop(self):
         """Async simulation loop"""
-        print(f"Simulation loop. Engine running: {self._running}")
+        print("✓ Simulation loop started successfully!")
+        loop_count = 0
         while True:
             self.calculate_engine_parameters()
             self.update_modbus_registers()
+            
+            # Debug output every 10 seconds
+            loop_count += 1
+            if loop_count % 10 == 0 or self._running:
+                print(f"[SIM] Loop {loop_count}: Running={self._running}, RPM={self.current_rpm:.1f}, Temp={self.current_temp:.1f}, Status={self.status}")
+            
             await asyncio.sleep(self.config['engine']['update_interval'])
             
     def calculate_engine_parameters(self):
@@ -126,6 +136,9 @@ class MainEngineSimulator:
                 print("Alarms have been triggered")
         else:
             # Engine is running/starting
+            if self.current_rpm == 0:  # First time starting
+                print(f"[SIM] Engine starting - calculating parameters from RPM=0 to target={self.config['engine']['rpm_normal']}")
+            
             target_rpm = self.config['engine']['rpm_normal']
             rpm_fluctuation = random.uniform(-50, 50)
             

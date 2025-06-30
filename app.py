@@ -69,6 +69,7 @@ mqtt_sensor = None
 
 async def broadcast_state():
     """Broadcast engine and sensor states to all connected clients"""
+    broadcast_count = 0
     while True:
         if connections:
             # Make a copy of connections set to avoid runtime error
@@ -91,6 +92,11 @@ async def broadcast_state():
                     "setpoints": plc.setpoints
                 }
             }
+            
+            # Debug output when engine is running
+            broadcast_count += 1
+            if simulator.status == 1 and broadcast_count % 5 == 0:  # Every 5 seconds when running
+                print(f"[BROADCAST] Sending to {len(current_connections)} clients: RPM={simulator.current_rpm:.1f}, Status={simulator.status}")
             
             for connection in current_connections:
                 try:
@@ -132,6 +138,9 @@ async def startup_event():
     
     # Start Modbus server
     simulator.start_server()
+    
+    # Start simulation loop
+    await simulator.start_simulation_loop()
     
     try:
         # Initialize and start MQTT sensor (optional)
