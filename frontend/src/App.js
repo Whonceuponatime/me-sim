@@ -11,7 +11,6 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsi
 import GaugeChart from 'react-gauge-chart';
 import AnimatedGauge from './components/AnimatedGauge';
 import TopologyView from './components/TopologyView';
-import SettingsPage from './components/SettingsPage';
 import logo from './assets/logo.png';
 import WarningIcon from '@mui/icons-material/Warning';
 import ErrorIcon from '@mui/icons-material/Error';
@@ -21,38 +20,52 @@ import SpeedIcon from '@mui/icons-material/Speed';
 import ThermostatIcon from '@mui/icons-material/Thermostat';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 
-// Default settings - will be overridden by saved settings
-const DEFAULT_SETTINGS = {
-  websocketUrl: 'ws://192.168.0.175:8000/ws',
-  modbusHost: '192.168.0.175',
-  modbusPort: 502,
-  reconnectDelay: 2000,
-  maxReconnectAttempts: 5,
-  rpmMin: 600,
-  rpmMax: 1200,
-  rpmNormal: 900,
-  tempMin: 70,
-  tempMax: 120,
-  tempNormal: 85,
-  tempWarning: 90,
-  tempCritical: 105,
-  fuelFlowMin: 0.5,
-  fuelFlowMax: 2.5,
-  fuelFlowNormal: 1.5,
-  updateInterval: 1.0,
-  chartUpdateInterval: 1000,
-  maxHistoryPoints: 50,
-  darkMode: true,
-  showDebugInfo: false,
-  enableSounds: false,
-  enableAlarmFlashing: true,
-  gaugeAnimationSpeed: 300,
-  enableSecurityLogging: true,
-  maxUnauthorizedAttempts: 3,
-  securityAlertLevel: 'high'
+// Dynamic WebSocket URL configuration
+const getWebSocketURL = async () => {
+  try {
+    // First, try to load from remote_settings.json
+    const response = await fetch('/remote_settings.json');
+    if (response.ok) {
+      const settings = await response.json();
+      if (settings.websocketUrl) {
+        console.log('Using WebSocket URL from remote_settings.json:', settings.websocketUrl);
+        return settings.websocketUrl;
+      }
+    }
+  } catch (error) {
+    console.log('Could not load remote_settings.json, using dynamic detection');
+  }
+
+  // Fallback: Detect current host and construct WebSocket URL
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const host = window.location.hostname;
+  const port = 8000; // Backend port
+  
+  // If we're on localhost, try the local backend
+  if (host === 'localhost' || host === '127.0.0.1') {
+    return `${protocol}//${host}:${port}/ws`;
+  }
+  
+  // For other hosts, assume backend is on the same host
+  return `${protocol}//${host}:${port}/ws`;
 };
 
-// Engine configuration will be dynamically set from settings
+const RECONNECT_DELAY = 2000; // 2 seconds delay between reconnection attempts
+const MAX_RECONNECT_ATTEMPTS = 5;
+
+// Add engine configuration constants
+const ENGINE_CONFIG = {
+  rpm_max: 2000,
+  rpm_min: 0,
+  temp_max: 95,
+  temp_min: 20,
+  temp_warning: 75,
+  temp_critical: 85,
+  fuel_flow_max: 5.0,
+  fuel_flow_min: 0,
+  load_warning: 80,
+  load_critical: 90
+};
 
 // Add sensor configuration constants
 const SENSOR_CONFIG = {
@@ -137,18 +150,6 @@ function TabPanel({ children, value, index }) {
 
 function App() {
   const [currentTab, setCurrentTab] = useState(0);
-  
-  // Load settings from localStorage or use defaults
-  const [settings, setSettings] = useState(() => {
-    try {
-      const savedSettings = localStorage.getItem('engineSettings');
-      return savedSettings ? { ...DEFAULT_SETTINGS, ...JSON.parse(savedSettings) } : DEFAULT_SETTINGS;
-    } catch (error) {
-      console.error('Error loading settings:', error);
-      return DEFAULT_SETTINGS;
-    }
-  });
-
   const [engineData, setEngineData] = useState({
     rpm: 0,
     temperature: 0,
@@ -177,50 +178,34 @@ function App() {
   const reconnectAttempts = useRef(0);
   const reconnectTimeout = useRef(null);
 
-  // Settings change handler
-  const handleSettingsChange = useCallback((newSettings) => {
-    setSettings(newSettings);
-    localStorage.setItem('engineSettings', JSON.stringify(newSettings));
-    
-    // Reconnect WebSocket if URL changed
-    if (newSettings.websocketUrl !== settings.websocketUrl) {
-      if (wsRef.current) {
-        wsRef.current.close();
-      }
-      // Small delay to allow cleanup - we'll trigger reconnection via useEffect
-      setTimeout(() => {
-        setWsConnected(false);
-      }, 100);
-    }
-  }, [settings.websocketUrl]);
-
   // Memoize the gauge values to prevent unnecessary re-renders
   const gaugeValues = useMemo(() => ({
     rpm: {
       value: engineData.rpm,
-      normalized: engineData.rpm / settings.rpmMax
+      normalized: engineData.rpm / ENGINE_CONFIG.rpm_max
     },
     temperature: {
       value: engineData.temperature,
-      normalized: (engineData.temperature - settings.tempMin) / 
-                 (settings.tempMax - settings.tempMin)
+      normalized: (engineData.temperature - ENGINE_CONFIG.temp_min) / 
+                 (ENGINE_CONFIG.temp_max - ENGINE_CONFIG.temp_min)
     },
     fuelFlow: {
       value: engineData.fuel_flow,
-      normalized: engineData.fuel_flow / settings.fuelFlowMax
+      normalized: engineData.fuel_flow / ENGINE_CONFIG.fuel_flow_max
     },
     load: {
       value: engineData.load,
       normalized: engineData.load / 100
     }
-  }), [engineData, settings]);
+  }), [engineData]);
 
-  const connectWebSocket = useCallback(() => {
+  const connectWebSocket = useCallback(async () => {
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
 
     try {
-      console.log(`Attempting to connect to WebSocket at ${settings.websocketUrl}...`);
-      const ws = new WebSocket(settings.websocketUrl);
+      const websocketUrl = await getWebSocketURL();
+      console.log('Attempting to connect to WebSocket:', websocketUrl);
+      const ws = new WebSocket(websocketUrl);
       wsRef.current = ws;
 
       ws.onopen = () => {
@@ -239,12 +224,12 @@ function App() {
         }
 
         // Attempt to reconnect if we haven't exceeded max attempts
-        if (reconnectAttempts.current < settings.maxReconnectAttempts) {
-          console.log(`Attempting to reconnect... (${reconnectAttempts.current + 1}/${settings.maxReconnectAttempts})`);
-          reconnectTimeout.current = setTimeout(() => {
+        if (reconnectAttempts.current < MAX_RECONNECT_ATTEMPTS) {
+          console.log(`Attempting to reconnect... (${reconnectAttempts.current + 1}/${MAX_RECONNECT_ATTEMPTS})`);
+          reconnectTimeout.current = setTimeout(async () => {
             reconnectAttempts.current += 1;
-            connectWebSocket();
-          }, settings.reconnectDelay);
+            await connectWebSocket();
+          }, RECONNECT_DELAY);
         } else {
           console.error('Max reconnection attempts reached. Please refresh the page.');
         }
@@ -280,7 +265,7 @@ function App() {
               return {
                 ...prevData,
                 ...data.engine,
-                history: [...prevData.history, newHistoryPoint].slice(-settings.maxHistoryPoints)
+                history: [...prevData.history, newHistoryPoint].slice(-50)
               };
             });
 
@@ -322,15 +307,18 @@ function App() {
     } catch (error) {
       console.error('Error creating WebSocket connection:', error);
       // Attempt to reconnect after delay
-      reconnectTimeout.current = setTimeout(() => {
-        connectWebSocket();
-      }, settings.reconnectDelay);
+      reconnectTimeout.current = setTimeout(async () => {
+        await connectWebSocket();
+      }, RECONNECT_DELAY);
     }
-  }, [settings.websocketUrl, settings.reconnectDelay, settings.maxReconnectAttempts]);
+  }, []);
 
-  // Handle WebSocket connection and reconnection
+  // Cleanup on component unmount
   useEffect(() => {
-    connectWebSocket();
+    const initWebSocket = async () => {
+      await connectWebSocket();
+    };
+    initWebSocket();
     return () => {
       if (reconnectTimeout.current) {
         clearTimeout(reconnectTimeout.current);
@@ -341,13 +329,6 @@ function App() {
       }
     };
   }, [connectWebSocket]);
-
-  // Handle settings changes that require reconnection
-  useEffect(() => {
-    if (!wsConnected && wsRef.current?.readyState !== WebSocket.CONNECTING) {
-      connectWebSocket();
-    }
-  }, [wsConnected, connectWebSocket]);
 
   const sendCommand = useCallback((command, data = {}) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -490,7 +471,6 @@ function App() {
                 <Tab label="Dashboard" />
                 <Tab label="Topology" />
                 <Tab label="Trends" />
-                <Tab label="Settings" />
               </Tabs>
           </Box>
         </Toolbar>
@@ -541,7 +521,7 @@ function App() {
                         <AnimatedGauge
                           id="rpm-gauge"
                           value={engineData.rpm}
-                          normalizedValue={gaugeValues.rpm.normalized}
+                          normalizedValue={engineData.rpm / ENGINE_CONFIG.rpm_max}
                           label="RPM"
                           formatValue={(value) => `${value.toFixed(0)} RPM`}
                           colors={['#00ff00', '#ffff00', '#ff0000']}
@@ -558,7 +538,7 @@ function App() {
                         <AnimatedGauge
                           id="temp-gauge"
                           value={engineData.temperature}
-                          normalizedValue={gaugeValues.temperature.normalized}
+                          normalizedValue={engineData.temperature / ENGINE_CONFIG.temp_max}
                           label="TEMPERATURE"
                           formatValue={(value) => `${value.toFixed(1)}°C`}
                           colors={['#00ff00', '#ffff00', '#ff0000']}
@@ -575,7 +555,7 @@ function App() {
                         <AnimatedGauge
                           id="load-gauge"
                           value={engineData.load}
-                          normalizedValue={gaugeValues.load.normalized}
+                          normalizedValue={engineData.load / 100}
                           label="LOAD"
                           formatValue={(value) => `${value.toFixed(0)}%`}
                           colors={['#00ff00', '#ffff00', '#ff0000']}
@@ -913,13 +893,6 @@ function App() {
               {/* ... existing trends content ... */}
             </Grid>
           )}
-          
-                     {currentTab === 3 && (
-             <SettingsPage
-               onSettingsChange={handleSettingsChange}
-               currentSettings={settings}
-             />
-           )}
       </Container>
     </Box>
     </ThemeProvider>

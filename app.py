@@ -1,7 +1,6 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-from contextlib import asynccontextmanager
 import uvicorn
 import asyncio
 import json
@@ -11,6 +10,57 @@ from datetime import datetime
 from engine.simulator import MainEngineSimulator
 from plc.controller import PLCController
 from sensors.mqtt_sensor import MQTTSensor
+
+app = FastAPI(title="ME Simulator")
+
+# Define allowed origins - more flexible for different machines
+origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://192.168.0.35:3000",
+    "http://0.0.0.0:3000",
+    # Allow WebSocket connections
+    "ws://localhost:8000",
+    "ws://127.0.0.1:8000",
+    "ws://192.168.0.35:8000",
+    "ws://0.0.0.0:8000",
+    # Allow backend URLs
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+    "http://192.168.0.35:8000",
+    "http://0.0.0.0:8000"
+]
+
+# For development/demo purposes, allow all origins from private network ranges
+import re
+def is_private_network(origin):
+    """Check if origin is from a private network"""
+    if not origin:
+        return False
+    patterns = [
+        r'https?://192\.168\.\d+\.\d+:3000',
+        r'https?://10\.\d+\.\d+\.\d+:3000',  
+        r'https?://172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+:3000',
+        r'https?://localhost:3000',
+        r'https?://127\.0\.0\.1:3000'
+    ]
+    return any(re.match(pattern, origin) for pattern in patterns)
+
+# CORS middleware with dynamic origin checking
+app.add_middleware(
+    CORSMiddleware,
+    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+):(3000|8000)",
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "OPTIONS", "PATCH", "DELETE"],
+    allow_headers=["*"],
+    expose_headers=["*"]
+)
+
+# Serve static files (React frontend)
+app.mount("/static", StaticFiles(directory="frontend/build"), name="static")
+
+# WebSocket connections store
+connections: Set[WebSocket] = set()
 
 # Component placeholders
 simulator = None
@@ -68,13 +118,10 @@ async def broadcast_state():
         
         await asyncio.sleep(1)
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Lifespan event handler for startup and shutdown"""
+@app.on_event("startup")
+async def startup_event():
+    """Start all components"""
     global simulator, plc, mqtt_sensor
-    
-    # Startup
-    print("Starting up application...")
     
     # Initialize components
     simulator = MainEngineSimulator()
@@ -98,66 +145,12 @@ async def lifespan(app: FastAPI):
     
     # Start state broadcaster
     asyncio.create_task(broadcast_state())
-    
-    yield
-    
-    # Shutdown
-    print("Shutting down application...")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Stop all components"""
     if mqtt_sensor:
         mqtt_sensor.stop()
-
-app = FastAPI(title="ME Simulator", lifespan=lifespan)
-
-# Define allowed origins - Add your network IPs here
-origins = [
-    # Local development
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "http://0.0.0.0:3000",
-    
-    # Common private network ranges (192.168.x.x)
-    "http://192.168.1.*:3000",
-    "http://192.168.0.*:3000", 
-    "http://192.168.2.*:3000",
-    
-    # Common private network ranges (10.x.x.x)
-    "http://10.*.*.*:3000",
-    
-    # WebSocket connections
-    "ws://localhost:8000",
-    "ws://127.0.0.1:8000",
-    "ws://0.0.0.0:8000",
-    "ws://192.168.1.*:8000",
-    "ws://192.168.0.*:8000",
-    "ws://192.168.2.*:8000", 
-    "ws://10.*.*.*:8000",
-    
-    # Backend URLs
-    "http://localhost:8000",
-    "http://127.0.0.1:8000",
-    "http://0.0.0.0:8000",
-    "http://192.168.1.*:8000",
-    "http://192.168.0.*:8000",
-    "http://192.168.2.*:8000",
-    "http://10.*.*.*:8000"
-]
-
-# CORS middleware - Allow all origins for development/demo
-# For production, replace "*" with specific origins list
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for cross-machine access
-    allow_credentials=False,  # Must be False when allow_origins=["*"]
-    allow_methods=["GET", "POST", "OPTIONS", "PATCH", "DELETE"],
-    allow_headers=["*"],
-    expose_headers=["*"]
-)
-
-# Serve static files (React frontend)
-app.mount("/static", StaticFiles(directory="frontend/build"), name="static")
-
-# WebSocket connections store
-connections: Set[WebSocket] = set()
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
@@ -245,49 +238,8 @@ async def get_status():
             "alarms": plc.alarms,
             "setpoints": plc.setpoints
         },
-        "mqtt_sensors": mqtt_sensor.generate_sensor_data() if mqtt_sensor else {}
+        "mqtt_sensors": mqtt_sensor.generate_sensor_data()
     }
-
-@app.get("/api/settings")
-async def get_settings():
-    """Get current system settings"""
-    return {
-        "engine": simulator.config.get('engine', {}),
-        "modbus": simulator.config.get('modbus', {}),
-        "registers": simulator.config.get('registers', {})
-    }
-
-@app.post("/api/settings")
-async def update_settings(settings: dict):
-    """Update system settings"""
-    try:
-        # Update engine configuration if provided
-        if 'engine' in settings:
-            engine_settings = settings['engine']
-            for key, value in engine_settings.items():
-                if key in simulator.config['engine']:
-                    simulator.config['engine'][key] = value
-                    print(f"Updated engine setting: {key} = {value}")
-        
-        # Update modbus configuration if provided
-        if 'modbus' in settings:
-            modbus_settings = settings['modbus']
-            for key, value in modbus_settings.items():
-                if key in simulator.config['modbus']:
-                    simulator.config['modbus'][key] = value
-                    print(f"Updated modbus setting: {key} = {value}")
-        
-        # Save updated config to file
-        import yaml
-        from pathlib import Path
-        config_file = Path(__file__).parent / 'config.yaml'
-        with open(config_file, 'w') as f:
-            yaml.dump(simulator.config, f, default_flow_style=False)
-        
-        return {"status": "success", "message": "Settings updated successfully"}
-    
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
 
 if __name__ == "__main__":
     import asyncio

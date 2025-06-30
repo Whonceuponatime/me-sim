@@ -65,6 +65,8 @@ The simulation parameters can be configured in `config.yaml`. Key parameters inc
 
 ## Usage
 
+### Local Usage (Single Machine)
+
 1. Start the backend server:
 ```bash
 python app.py
@@ -77,6 +79,79 @@ npm start
 ```
 
 3. Open your browser and navigate to `http://localhost:3000`
+
+### Remote Access (Multiple Machines)
+
+To run the simulator on one machine and access it from another:
+
+#### Quick Start (Easiest)
+
+Run the all-in-one script that configures IP and starts both servers:
+```bash
+python start_remote.py
+```
+
+This script will:
+1. Automatically detect and configure the correct IP address
+2. Start the backend server
+3. Start the frontend server
+4. Display access URLs for local and remote connections
+
+#### Manual Configuration Steps
+
+1. On the machine that will host the simulator, run the IP configuration helper:
+```bash
+python configure_ip.py
+```
+
+2. Follow the prompts to configure the correct IP address
+
+3. Start the backend and frontend as usual:
+```bash
+# Terminal 1: Start backend
+python app.py
+
+# Terminal 2: Start frontend  
+cd frontend
+npm start
+```
+
+4. From other machines, access the simulator at:
+   - Frontend: `http://[HOST_IP]:3000`
+   - The frontend will automatically connect to the backend
+
+#### Manual Configuration
+
+1. Edit `remote_settings.json` and update the IP addresses:
+```json
+{
+  "websocketUrl": "ws://YOUR_IP_ADDRESS:8000/ws",
+  "modbusHost": "YOUR_IP_ADDRESS",
+  ...
+}
+```
+
+2. Copy the settings to the frontend:
+```bash
+copy remote_settings.json frontend\public\remote_settings.json
+```
+
+3. Start both backend and frontend servers
+
+#### Firewall Configuration
+
+Make sure the following ports are open on the host machine:
+- **Port 8000**: Backend WebSocket and API server
+- **Port 3000**: Frontend development server
+- **Port 502**: Modbus TCP server (if using external Modbus clients)
+
+#### Troubleshooting Remote Access
+
+- **"Start Engine" button doesn't work**: Usually indicates WebSocket connection failure
+- **Connection lost alerts**: Check firewall settings and network connectivity
+- **Frontend loads but no data**: Verify backend is running and ports are accessible
+
+Use browser developer tools (F12) → Console to check for WebSocket connection errors.
 
 ## Components
 

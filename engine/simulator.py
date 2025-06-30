@@ -107,73 +107,65 @@ class MainEngineSimulator:
         """Calculate realistic engine parameters based on current state"""
         if not self._running:
             # Engine is stopping - gradually decrease all parameters
-            if self.current_rpm > 0:
-                self.current_rpm = max(0, self.current_rpm - random.uniform(50, 100))
-                self.current_fuel_flow = max(0, self.current_fuel_flow - random.uniform(0.1, 0.2))
-                self.current_temp = max(
-                    self.config['engine']['temp_min'],
-                    self.current_temp - random.uniform(1, 2)
-                )
-                self.current_load = max(0, self.current_load - random.uniform(5, 10))
+            self.current_rpm = max(0, self.current_rpm - random.uniform(50, 100))
+            self.current_fuel_flow = max(0, self.current_fuel_flow - random.uniform(0.1, 0.2))
+            self.current_temp = max(
+                self.config['engine']['temp_min'],
+                self.current_temp - random.uniform(1, 2)
+            )
+            self.current_load = max(0, self.current_load - random.uniform(5, 10))
             
-            # When engine fully stops, set all parameters to zero (only once)
-            if self.current_rpm <= 10 and self.current_rpm > 0:
+            # When engine fully stops, set all parameters to zero
+            if self.current_rpm < 10:
                 self.current_rpm = 0
                 self.current_fuel_flow = 0
                 self.current_load = 0
                 self._update_status(0)
                 print("\n[ENGINE STOPPED] Engine has been shut down")
                 print("All parameters have been reset to zero")
+                print("Alarms have been triggered")
         else:
-            # Engine is running/starting - ensure proper startup sequence
+            # Engine is running/starting
             target_rpm = self.config['engine']['rpm_normal']
+            rpm_fluctuation = random.uniform(-50, 50)
             
-            # If engine just started, begin from minimum RPM
-            if self.current_rpm == 0:
-                self.current_rpm = self.config['engine']['rpm_min']
-                print(f"[ENGINE STARTUP] Starting from {self.current_rpm} RPM")
-            
-            # Gradual RPM increase with realistic acceleration
             if self.current_rpm < target_rpm:
-                rpm_increase = random.uniform(20, 50)  # Realistic acceleration rate
-                self.current_rpm = min(target_rpm, self.current_rpm + rpm_increase)
-                print(f"[ENGINE ACCELERATION] RPM: {self.current_rpm:.0f} -> Target: {target_rpm}")
+                self.current_rpm = min(
+                    target_rpm + rpm_fluctuation,
+                    self.current_rpm + random.uniform(100, 200)
+                )
             else:
-                # Add normal fluctuation around target RPM
-                rpm_fluctuation = random.uniform(-25, 25)
-                self.current_rpm = max(target_rpm - 50, min(target_rpm + 50, target_rpm + rpm_fluctuation))
+                self.current_rpm = target_rpm + rpm_fluctuation
             
-            # Temperature calculation - gradual warmup
+            # Temperature calculation
             target_temp = self.config['engine']['temp_normal']
+            temp_fluctuation = random.uniform(-2, 2)
             
             if self.current_temp < target_temp:
-                temp_increase = random.uniform(0.5, 2.0)  # Gradual temperature rise
-                self.current_temp = min(target_temp, self.current_temp + temp_increase)
+                self.current_temp = min(
+                    target_temp + temp_fluctuation,
+                    self.current_temp + random.uniform(1, 3)
+                )
             else:
-                temp_fluctuation = random.uniform(-1, 1)
                 self.current_temp = target_temp + temp_fluctuation
             
-            # Fuel flow calculation based on actual RPM
-            rpm_ratio = self.current_rpm / self.config['engine']['rpm_max']
-            base_fuel_flow = rpm_ratio * self.config['engine']['fuel_flow_normal']
-            fuel_fluctuation = random.uniform(-0.1, 0.1)
-            self.current_fuel_flow = max(0.1, base_fuel_flow + fuel_fluctuation)
+            # Fuel flow calculation
+            base_fuel_flow = (self.current_rpm / self.config['engine']['rpm_max']) * \
+                           self.config['engine']['fuel_flow_normal']
+            fuel_fluctuation = random.uniform(-0.3, 0.3)
+            self.current_fuel_flow = max(0, base_fuel_flow + fuel_fluctuation)
             
-            # Calculate load based on RPM
-            if self.current_rpm > self.config['engine']['rpm_min']:
-                rpm_range = self.config['engine']['rpm_max'] - self.config['engine']['rpm_min']
-                current_range = self.current_rpm - self.config['engine']['rpm_min']
-                base_load = int((current_range / rpm_range) * 100)
-                load_fluctuation = random.randint(-3, 3)
-                self.current_load = max(0, min(100, base_load + load_fluctuation))
-            else:
-                self.current_load = 0
+            # Calculate load
+            base_load = int((self.current_rpm - self.config['engine']['rpm_min']) / 
+                          (self.config['engine']['rpm_max'] - self.config['engine']['rpm_min']) * 100)
+            load_fluctuation = random.randint(-5, 5)
+            self.current_load = max(0, min(100, base_load + load_fluctuation))
             
             # Update status based on parameters
-            if self.current_temp > self.config['engine']['temp_max'] * 0.95:
-                self._update_status(3)  # Alarm
-            elif self.current_temp > self.config['engine']['temp_max'] * 0.9:
+            if self.current_temp > self.config['engine']['temp_max'] * 0.9:
                 self._update_status(2)  # Warning
+            elif self.current_temp > self.config['engine']['temp_max']:
+                self._update_status(3)  # Alarm
             else:
                 self._update_status(1)  # Running
 
