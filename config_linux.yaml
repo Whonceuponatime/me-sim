@@ -1,0 +1,56 @@
+# Main Engine Simulation Configuration for Linux Deployment
+# This configuration is optimized for remote deployment on Linux VMs
+
+modbus:
+  host: "0.0.0.0"    # Bind to all interfaces for remote access
+  port: 502          # Standard Modbus TCP port (requires root or use port 5020)
+
+engine:
+  # RPM ranges
+  rpm_min: 600
+  rpm_max: 1200
+  rpm_normal: 900
+  
+  # Temperature ranges (°C)
+  temp_min: 70
+  temp_max: 120
+  temp_normal: 85
+  
+  # Fuel flow ranges (tons/hour)
+  fuel_flow_min: 0.5
+  fuel_flow_max: 2.5
+  fuel_flow_normal: 1.5
+
+  # Update interval (seconds) - optimized for network transmission
+  update_interval: 1.0
+
+# WARNING: These registers are publicly accessible without authentication
+# This demonstrates real-world SCADA/ICS security vulnerabilities
+registers:
+  status: 0          # 0: Stopped, 1: Running, 2: Warning, 3: Alarm
+  rpm: 1             # Current RPM value
+  temp: 2            # Current temperature (°C)
+  fuel_flow: 3       # Current fuel flow (tons/hour * 100)
+  load: 4            # Current load percentage
+
+# Security monitoring settings
+security:
+  log_unauthorized_access: true
+  max_unauthorized_attempts: 5
+  alert_threshold: 3
+  
+# Network settings for remote deployment
+network:
+  # Allow connections from any IP (for demonstration purposes)
+  # In production, this should be restricted to specific IP ranges
+  allowed_networks:
+    - "0.0.0.0/0"  # WARNING: Allows all IPs - for demonstration only
+  
+  # Firewall considerations:
+  # - Port 502 (Modbus TCP) must be open
+  # - Consider using non-standard ports for additional security
+  
+# Deployment notes:
+# 1. Run with sudo for port 502, or use port 5020 without sudo
+# 2. Configure firewall to allow Modbus TCP traffic
+# 3. This configuration demonstrates industrial protocol vulnerabilities 

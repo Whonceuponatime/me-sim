@@ -1,0 +1,53 @@
+{
+  "comment": "Configuration for connecting to remote MODBUS backend",
+  "comment2": "Copy this file to remote_settings.json and update the IP addresses",
+  
+  "_BACKEND_SERVER_IP": "192.168.1.100",
+  "_COMMENT": "Replace with your Linux VM IP address running standalone_backend.py",
+  
+  "websocketUrl": "ws://192.168.1.100:8000/ws",
+  "modbusHost": "192.168.1.100",
+  "modbusPort": 502,
+  
+  "reconnectDelay": 2000,
+  "maxReconnectAttempts": 10,
+  
+  "rpmMin": 600,
+  "rpmMax": 1200,
+  "rpmNormal": 900,
+  
+  "tempMin": 70,
+  "tempMax": 120,
+  "tempNormal": 85,
+  "tempWarning": 90,
+  "tempCritical": 105,
+  
+  "fuelFlowMin": 0.5,
+  "fuelFlowMax": 2.5,
+  "fuelFlowNormal": 1.5,
+  
+  "updateInterval": 1.0,
+  "chartUpdateInterval": 1000,
+  "maxHistoryPoints": 50,
+  
+  "darkMode": true,
+  "showDebugInfo": true,
+  "enableSounds": false,
+  "enableAlarmFlashing": true,
+  "gaugeAnimationSpeed": 300,
+  
+  "enableSecurityLogging": true,
+  "maxUnauthorizedAttempts": 3,
+  "securityAlertLevel": "high",
+  
+  "deployment": {
+    "mode": "remote",
+    "backendType": "modbus_only",
+    "notes": [
+      "This configuration connects to a standalone MODBUS backend",
+      "The backend should be running standalone_backend.py",
+      "WebSocket functionality may not be available in MODBUS-only mode",
+      "Use the vulnerability demo script to test MODBUS connectivity"
+    ]
+  }
+} 
