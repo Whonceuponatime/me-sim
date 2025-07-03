@@ -102,18 +102,27 @@ class StandaloneEngineSimulator:
     def start_server(self):
         """Start the MODBUS TCP server"""
         try:
-            success = self.server.start()
-            if success:
+            # Attempt to start the server
+            start_result = self.server.start()
+            
+            # Give the server a moment to initialize
+            time.sleep(0.5)
+            
+            # Check if server is actually running (more reliable than start() return value)
+            if self.server.is_run:
                 print(f"✓ MODBUS TCP Server started successfully")
                 print(f"  Host: {self.config['modbus']['host']}")
                 print(f"  Port: {self.config['modbus']['port']}")
                 print(f"  Registers: {list(self.config['registers'].values())}")
+                print(f"  Start method returned: {start_result} (but server is running)")
                 print("\nWARNING: This server is running without authentication!")
                 print("Any MODBUS client can connect and control the engine.")
                 print("This demonstrates real-world SCADA/ICS security vulnerabilities.")
                 return True
             else:
                 print(f"✗ Failed to start MODBUS TCP server")
+                print(f"  Start method returned: {start_result}")
+                print(f"  Server is_run status: {self.server.is_run}")
                 return False
         except Exception as e:
             print(f"✗ Error starting MODBUS TCP server: {e}")
