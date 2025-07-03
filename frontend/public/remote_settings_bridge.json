@@ -1,0 +1,55 @@
+{
+  "comment": "Configuration for MODBUS Bridge Setup",
+  "comment2": "Use this when running standalone MODBUS backend + bridge service",
+  
+  "_ARCHITECTURE": "VM: standalone_backend.py (MODBUS) + modbus_bridge.py (REST API) → Frontend",
+  
+  "websocketUrl": null,
+  "apiBaseUrl": "http://192.168.0.25:8000/api",
+  "modbusHost": "192.168.0.25",
+  "modbusPort": 5020,
+  
+  "reconnectDelay": 2000,
+  "maxReconnectAttempts": 10,
+  "dataUpdateInterval": 2000,
+  
+  "rpmMin": 600,
+  "rpmMax": 1200,
+  "rpmNormal": 900,
+  
+  "tempMin": 70,
+  "tempMax": 120,
+  "tempNormal": 85,
+  "tempWarning": 90,
+  "tempCritical": 105,
+  
+  "fuelFlowMin": 0.5,
+  "fuelFlowMax": 2.5,
+  "fuelFlowNormal": 1.5,
+  
+  "updateInterval": 1.0,
+  "chartUpdateInterval": 2000,
+  "maxHistoryPoints": 50,
+  
+  "darkMode": true,
+  "showDebugInfo": true,
+  "enableSounds": false,
+  "enableAlarmFlashing": true,
+  "gaugeAnimationSpeed": 300,
+  
+  "enableSecurityLogging": true,
+  "maxUnauthorizedAttempts": 3,
+  "securityAlertLevel": "high",
+  
+  "deployment": {
+    "mode": "remote",
+    "backendType": "modbus_with_bridge",
+    "dataSource": "rest_api",
+    "notes": [
+      "This configuration uses MODBUS backend + REST API bridge",
+      "Backend: standalone_backend.py on VM",
+      "Bridge: modbus_bridge.py provides REST API",
+      "Frontend polls REST API for data"
+    ]
+  }
+} 
