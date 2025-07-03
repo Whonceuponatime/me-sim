@@ -50,6 +50,29 @@ const getWebSocketURL = async () => {
   return `${protocol}//${host}:${port}/ws`;
 };
 
+// Get API configuration for REST API mode
+const getAPIConfig = async () => {
+  try {
+    const response = await fetch('/remote_settings.json');
+    if (response.ok) {
+      const settings = await response.json();
+      return {
+        apiBaseUrl: settings.apiBaseUrl,
+        dataUpdateInterval: settings.dataUpdateInterval || 2000,
+        useRestAPI: settings.deployment?.dataSource === 'rest_api' || settings.websocketUrl === null
+      };
+    }
+  } catch (error) {
+    console.log('Could not load API config from remote_settings.json');
+  }
+  
+  return {
+    apiBaseUrl: null,
+    dataUpdateInterval: 2000,
+    useRestAPI: false
+  };
+};
+
 const RECONNECT_DELAY = 2000; // 2 seconds delay between reconnection attempts
 const MAX_RECONNECT_ATTEMPTS = 5;
 
@@ -174,9 +197,13 @@ function App() {
 
   const [historicalData, setHistoricalData] = useState([]);
   const [wsConnected, setWsConnected] = useState(false);
+  const [apiConnected, setApiConnected] = useState(false);
+  const [useRestAPI, setUseRestAPI] = useState(false);
+  const [apiConfig, setApiConfig] = useState({ apiBaseUrl: null, dataUpdateInterval: 2000 });
   const wsRef = useRef(null);
   const reconnectAttempts = useRef(0);
   const reconnectTimeout = useRef(null);
+  const apiPollingRef = useRef(null);
 
   // Memoize the gauge values to prevent unnecessary re-renders
   const gaugeValues = useMemo(() => ({
@@ -198,6 +225,96 @@ function App() {
       normalized: engineData.load / 100
     }
   }), [engineData]);
+
+  // REST API functions for bridge mode (moved before useEffect)
+  const fetchEngineData = useCallback(async () => {
+    if (!apiConfig.apiBaseUrl) return;
+
+    try {
+      const response = await fetch(`${apiConfig.apiBaseUrl}/status`);
+      if (response.ok) {
+        const data = await response.json();
+        console.log('API data received:', data);
+        
+        setApiConnected(true);
+        
+        if (data.engine) {
+          setEngineData(prevData => {
+            const newHistoryPoint = {
+              time: new Date().toLocaleTimeString(),
+              status: data.engine.status || 0,
+              rpm: data.engine.rpm || 0,
+              temperature: data.engine.temp || 0,
+              fuel_flow: data.engine.fuel_flow || 0,
+              load: data.engine.load || 0,
+              exhaust_temp: 0,
+              lube_oil_pressure: 0,
+              cooling_water_temp: 0,
+              turbocharger_speed: 0
+            };
+            
+            return {
+              rpm: data.engine.rpm || 0,
+              temperature: data.engine.temp || 0,
+              fuel_flow: data.engine.fuel_flow || 0,
+              load: data.engine.load || 0,
+              status: data.engine.status || 0,
+              history: [...(prevData.history || []), newHistoryPoint].slice(-50)
+            };
+          });
+        }
+      } else {
+        console.error('API request failed:', response.status);
+        setApiConnected(false);
+      }
+    } catch (error) {
+      console.error('Error fetching engine data:', error);
+      setApiConnected(false);
+    }
+  }, [apiConfig.apiBaseUrl]);
+
+  const sendAPICommand = useCallback(async (command, data = {}) => {
+    if (!apiConfig.apiBaseUrl) {
+      console.error('API base URL not configured');
+      return;
+    }
+
+    try {
+      let endpoint;
+      let method = 'POST';
+      
+      switch (command) {
+        case 'start_engine':
+          endpoint = `${apiConfig.apiBaseUrl}/engine/start`;
+          break;
+        case 'stop_engine':
+          endpoint = `${apiConfig.apiBaseUrl}/engine/stop`;
+          break;
+        default:
+          console.warn('Unknown command:', command);
+          return;
+      }
+
+      const response = await fetch(endpoint, {
+        method: method,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data)
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log('Command sent successfully:', result);
+        // Fetch updated data immediately
+        setTimeout(fetchEngineData, 500);
+      } else {
+        console.error('Command failed:', response.status);
+      }
+    } catch (error) {
+      console.error('Error sending command:', error);
+    }
+  }, [apiConfig.apiBaseUrl, fetchEngineData]);
 
   const connectWebSocket = useCallback(async () => {
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
@@ -313,12 +430,72 @@ function App() {
     }
   }, []);
 
-  // Cleanup on component unmount
+  // Initialize connection based on configuration
   useEffect(() => {
-    const initWebSocket = async () => {
-      await connectWebSocket();
+    const initConnection = async () => {
+      try {
+        // Get API configuration
+        const config = await getAPIConfig();
+        console.log('Configuration loaded:', config);
+        
+        setApiConfig(config);
+        setUseRestAPI(config.useRestAPI);
+        
+        if (config.useRestAPI && config.apiBaseUrl) {
+          console.log('Using REST API mode');
+          setWsConnected(false);
+          // Start API polling after a short delay to ensure state is updated
+          setTimeout(() => {
+            const fetchData = async () => {
+              try {
+                const response = await fetch(`${config.apiBaseUrl}/status`);
+                if (response.ok) {
+                  const data = await response.json();
+                  console.log('Initial API data received:', data);
+                  setApiConnected(true);
+                  
+                  if (data.engine) {
+                    setEngineData({
+                      rpm: data.engine.rpm || 0,
+                      temperature: data.engine.temp || 0,
+                      fuel_flow: data.engine.fuel_flow || 0,
+                      load: data.engine.load || 0,
+                      status: data.engine.status || 0,
+                      history: []
+                    });
+                  }
+                } else {
+                  setApiConnected(false);
+                }
+              } catch (error) {
+                console.error('Error fetching initial data:', error);
+                setApiConnected(false);
+              }
+            };
+
+            // Fetch initial data
+            fetchData();
+            
+            // Set up polling
+            const pollingInterval = setInterval(fetchData, config.dataUpdateInterval);
+            apiPollingRef.current = pollingInterval;
+          }, 1000);
+        } else {
+          console.log('Using WebSocket mode');
+          setApiConnected(false);
+          await connectWebSocket();
+        }
+      } catch (error) {
+        console.error('Failed to initialize connection:', error);
+        // Fallback to WebSocket mode
+        setUseRestAPI(false);
+        await connectWebSocket();
+      }
     };
-    initWebSocket();
+
+    initConnection();
+
+    // Cleanup function
     return () => {
       if (reconnectTimeout.current) {
         clearTimeout(reconnectTimeout.current);
@@ -327,23 +504,60 @@ function App() {
         wsRef.current.close();
         wsRef.current = null;
       }
+      if (apiPollingRef.current) {
+        clearInterval(apiPollingRef.current);
+        apiPollingRef.current = null;
+      }
     };
   }, [connectWebSocket]);
 
+  const startAPIPolling = useCallback(() => {
+    if (apiPollingRef.current) {
+      clearInterval(apiPollingRef.current);
+    }
+    
+    if (!apiConfig.apiBaseUrl) {
+      console.warn('Cannot start API polling: no API base URL configured');
+      return;
+    }
+    
+    // Start polling immediately
+    fetchEngineData();
+    
+    // Set up polling interval
+    apiPollingRef.current = setInterval(() => {
+      fetchEngineData();
+    }, apiConfig.dataUpdateInterval || 2000);
+    
+    console.log(`Started API polling every ${apiConfig.dataUpdateInterval || 2000}ms`);
+  }, [fetchEngineData, apiConfig.apiBaseUrl, apiConfig.dataUpdateInterval]);
+
+  const stopAPIPolling = useCallback(() => {
+    if (apiPollingRef.current) {
+      clearInterval(apiPollingRef.current);
+      apiPollingRef.current = null;
+      console.log('Stopped API polling');
+    }
+  }, []);
+
   const sendCommand = useCallback((command, data = {}) => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      try {
-        console.log('Sending command:', command);
-        wsRef.current.send(JSON.stringify({ command, ...data }));
-      } catch (error) {
-        console.error('Error sending command:', error);
+    if (useRestAPI) {
+      sendAPICommand(command, data);
+    } else {
+      if (wsRef.current?.readyState === WebSocket.OPEN) {
+        try {
+          console.log('Sending command:', command);
+          wsRef.current.send(JSON.stringify({ command, ...data }));
+        } catch (error) {
+          console.error('Error sending command:', error);
+          connectWebSocket();
+        }
+      } else {
+        console.warn('WebSocket not connected, reconnecting...');
         connectWebSocket();
       }
-    } else {
-      console.warn('WebSocket not connected, reconnecting...');
-      connectWebSocket();
     }
-  }, [connectWebSocket]);
+  }, [useRestAPI, sendAPICommand, connectWebSocket]);
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -476,9 +690,21 @@ function App() {
         </Toolbar>
       </AppBar>
 
-        {!wsConnected && (
+        {(!wsConnected && !useRestAPI) && (
           <Alert severity="error" sx={{ mb: 3 }}>
-            Connection lost. Attempting to reconnect...
+            WebSocket connection lost. Attempting to reconnect...
+          </Alert>
+        )}
+
+        {(!apiConnected && useRestAPI) && (
+          <Alert severity="error" sx={{ mb: 3 }}>
+            API connection failed. Check if bridge service is running.
+          </Alert>
+        )}
+
+        {(useRestAPI && apiConnected) && (
+          <Alert severity="info" sx={{ mb: 3 }}>
+            Connected to MODBUS bridge API
           </Alert>
         )}
 
