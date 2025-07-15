@@ -1,12 +1,12 @@
 {
-  "comment": "Configuration for MODBUS Bridge Setup - Standard Port 502 for Wireshark",
-  "comment2": "Use this when running standalone MODBUS backend + bridge service",
+  "comment": "Configuration for Two-VM Setup: Linux Backend + Windows Frontend",
+  "comment2": "Backend runs on Linux VM, Frontend runs on Windows VM",
   
-  "_ARCHITECTURE": "VM: standalone_backend.py (MODBUS) + modbus_bridge.py (REST API) → Frontend",
+  "_ARCHITECTURE": "VM: Linux (standalone_backend.py MODBUS) + Windows (modbus_bridge.py REST API + Frontend)",
   
   "websocketUrl": null,
-  "apiBaseUrl": "http://192.168.0.25:8000/api",
-  "modbusHost": "192.168.0.25",
+  "apiBaseUrl": "http://192.168.1.100:8000/api",
+  "modbusHost": "192.168.1.100",
   "modbusPort": 502,
   
   "reconnectDelay": 1000,
@@ -42,14 +42,25 @@
   "securityAlertLevel": "high",
   
   "deployment": {
-    "mode": "remote",
+    "mode": "two_vm_setup",
     "backendType": "modbus_with_bridge",
     "dataSource": "rest_api",
+    "linuxVM": {
+      "ip": "192.168.1.100",
+      "role": "backend",
+      "services": ["standalone_backend.py (MODBUS TCP)"]
+    },
+    "windowsVM": {
+      "ip": "192.168.1.101",
+      "role": "frontend",
+      "services": ["modbus_bridge.py (REST API)", "React Frontend"]
+    },
     "notes": [
-      "Standard MODBUS port 502 for Wireshark detection",
-      "Bridge polls MODBUS backend every 500ms",
-      "Monitor with: tcp.port == 502 or modbus",
-      "Packets now visible across network interface"
+      "Linux VM runs MODBUS TCP server on port 502",
+      "Windows VM runs bridge service on port 8000",
+      "Frontend connects to bridge on Windows VM",
+      "Monitor MODBUS traffic: tcp.port == 502",
+      "Monitor REST API traffic: tcp.port == 8000"
     ]
   }
 } 

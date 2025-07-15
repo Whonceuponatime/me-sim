@@ -483,7 +483,7 @@ function App() {
         } else {
           console.log('Using WebSocket mode');
           setApiConnected(false);
-          await connectWebSocket();
+      await connectWebSocket();
         }
       } catch (error) {
         console.error('Failed to initialize connection:', error);
@@ -544,18 +544,18 @@ function App() {
     if (useRestAPI) {
       sendAPICommand(command, data);
     } else {
-      if (wsRef.current?.readyState === WebSocket.OPEN) {
-        try {
-          console.log('Sending command:', command);
-          wsRef.current.send(JSON.stringify({ command, ...data }));
-        } catch (error) {
-          console.error('Error sending command:', error);
-          connectWebSocket();
-        }
-      } else {
-        console.warn('WebSocket not connected, reconnecting...');
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      try {
+        console.log('Sending command:', command);
+        wsRef.current.send(JSON.stringify({ command, ...data }));
+      } catch (error) {
+        console.error('Error sending command:', error);
         connectWebSocket();
       }
+    } else {
+      console.warn('WebSocket not connected, reconnecting...');
+      connectWebSocket();
+    }
     }
   }, [useRestAPI, sendAPICommand, connectWebSocket]);
 

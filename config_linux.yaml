@@ -1,91 +1,45 @@
-# MODBUS Engine Simulator Configuration - Linux VM Deployment
-# Updated for standard MODBUS port 502
+# Configuration for Linux VM Backend
+# This file configures the standalone MODBUS TCP server
 
-# Network Configuration
-network:
-  # Bind to all interfaces for remote access
-  host: '0.0.0.0'  # Allow connections from any IP
-  port: 502        # Standard MODBUS TCP port (requires sudo)
-  
-  # CORS settings for web frontend
-  cors_origins:
-    - "http://localhost:3000"           # Local development
-    - "http://127.0.0.1:3000"          # Local development alt
-    - "http://192.168.0.175:3000"      # Windows host frontend
-    - "http://192.168.0.25:3000"       # VM frontend
-    - "http://192.168.0.25:8000"       # Bridge service
+modbus:
+  host: "0.0.0.0"  # Listen on all network interfaces
+  port: 502         # Standard MODBUS TCP port
 
-# MODBUS Register Mapping
-registers:
-  status: 0      # Engine on/off (0=off, 1=on)
-  rpm: 1         # Engine RPM (600-1200)
-  temp: 2        # Engine temperature (70-120°C)  
-  fuel_flow: 3   # Fuel flow rate (stored as int*100, display as float)
-  load: 4        # Engine load percentage (0-100%)
-
-# Engine Simulation Parameters
 engine:
   rpm_min: 600
   rpm_max: 1200
-  rpm_idle: 650
   rpm_normal: 900
-  
   temp_min: 70
   temp_max: 120
-  temp_idle: 75
   temp_normal: 85
-  temp_warning: 90
-  temp_critical: 105
-  
   fuel_flow_min: 0.5
   fuel_flow_max: 2.5
-  fuel_flow_idle: 0.6
   fuel_flow_normal: 1.5
-  
-  load_min: 0
-  load_max: 100
-  
-  # Simulation timing
-  update_interval: 1.0  # seconds
-  startup_time: 15      # seconds to reach normal operating parameters
-  cooldown_time: 30     # seconds to cool down after shutdown
+  update_interval: 1.0
 
-# Security Settings
+registers:
+  status: 0      # Engine status (0=stopped, 1=running, 2=warning, 3=alarm)
+  rpm: 1         # Engine RPM
+  temp: 2        # Engine temperature
+  fuel_flow: 3   # Fuel flow rate
+  load: 4        # Engine load percentage
+
+# Security settings
 security:
   enable_logging: true
-  log_unauthorized_access: true
-  log_file: "/var/log/modbus_engine.log"
-  max_failed_attempts: 5
-  lockout_duration: 300  # seconds
-
-# Development/Debug
-debug:
-  enable_console_output: true
-  log_modbus_requests: true
-  simulate_network_delays: false
-  network_delay_ms: 50
-
-# WARNING: These registers are publicly accessible without authentication
-# This demonstrates real-world SCADA/ICS security vulnerabilities
-
-# Security monitoring settings
-security:
-  log_unauthorized_access: true
+  log_unauthorized_attempts: true
   max_unauthorized_attempts: 5
-  alert_threshold: 3
-  
-# Network settings for remote deployment
+
+# Network settings for two-VM setup
 network:
-  # Allow connections from any IP (for demonstration purposes)
-  # In production, this should be restricted to specific IP ranges
-  allowed_networks:
-    - "0.0.0.0/0"  # WARNING: Allows all IPs - for demonstration only
-  
-  # Firewall considerations:
-  # - Port 502 (Modbus TCP) must be open
-  # - Consider using non-standard ports for additional security
-  
-# Deployment notes:
-# 1. Run with sudo for port 502, or use port 5020 without sudo
-# 2. Configure firewall to allow Modbus TCP traffic
-# 3. This configuration demonstrates industrial protocol vulnerabilities 
+  bind_address: "0.0.0.0"  # Allow connections from any IP
+  port: 502                 # Standard MODBUS port
+  max_connections: 10       # Maximum concurrent connections
+  connection_timeout: 30    # Connection timeout in seconds
+
+# Logging configuration
+logging:
+  level: "INFO"
+  log_file: "backend.log"
+  log_unauthorized_commands: true
+  log_engine_events: true 
