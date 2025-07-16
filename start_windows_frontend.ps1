@@ -222,10 +222,21 @@ function Start-Frontend {
         }
     }
     
-    # Start React development server in background
+    # Start React development server using cmd instead of PowerShell
     Write-Host "Starting React development server..." -ForegroundColor White
     try {
-        Start-Process -FilePath "npm" -ArgumentList "start" -NoNewWindow
+        # Use cmd to run npm start
+        $processInfo = New-Object System.Diagnostics.ProcessStartInfo
+        $processInfo.FileName = "cmd.exe"
+        $processInfo.Arguments = "/c npm start"
+        $processInfo.WorkingDirectory = Get-Location
+        $processInfo.UseShellExecute = $false
+        $processInfo.CreateNoWindow = $true
+        
+        $process = New-Object System.Diagnostics.Process
+        $process.StartInfo = $processInfo
+        $process.Start()
+        
         Start-Sleep -Seconds 5
         Write-Host "Frontend started successfully" -ForegroundColor Green
         Write-Host "   Open your browser and navigate to: http://localhost:3000" -ForegroundColor Cyan
