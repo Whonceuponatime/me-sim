@@ -104,6 +104,38 @@ function Test-PythonInstallation {
     return $null
 }
 
+# Function to test Node.js installation
+function Test-NodeJSInstallation {
+    Write-Host "Testing Node.js installation..." -ForegroundColor Yellow
+    
+    # Test npm
+    try {
+        $result = & npm --version 2>$null
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "Node.js/npm found: $result" -ForegroundColor Green
+            return $true
+        }
+    } catch {
+        Write-Host "npm not found" -ForegroundColor Red
+    }
+    
+    # Test node
+    try {
+        $result = & node --version 2>$null
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "Node.js found: $result" -ForegroundColor Green
+            Write-Host "But npm is not available" -ForegroundColor Yellow
+            return $false
+        }
+    } catch {
+        Write-Host "Node.js not found" -ForegroundColor Red
+    }
+    
+    Write-Host "Error: Node.js/npm not found" -ForegroundColor Red
+    Write-Host "Please install Node.js from https://nodejs.org/" -ForegroundColor Yellow
+    return $false
+}
+
 # Function to start bridge service
 function Start-BridgeService {
     Write-Host "Starting Bridge Service..." -ForegroundColor Green
@@ -160,37 +192,69 @@ function Start-Frontend {
     Write-Host "Starting Frontend..." -ForegroundColor Green
     Write-Host "   This will start the React development server" -ForegroundColor White
     
+    # Test Node.js installation first
+    $nodeJSInstalled = Test-NodeJSInstallation
+    if (-not $nodeJSInstalled) {
+        Write-Host "Skipping frontend startup - Node.js not installed" -ForegroundColor Yellow
+        Write-Host "You can install Node.js from https://nodejs.org/" -ForegroundColor Yellow
+        Write-Host "Then run the frontend manually:" -ForegroundColor Yellow
+        Write-Host "  cd frontend" -ForegroundColor White
+        Write-Host "  npm install" -ForegroundColor White
+        Write-Host "  npm start" -ForegroundColor White
+        return $false
+    }
+    
     # Navigate to frontend directory
     Set-Location "frontend"
     
     # Check if node_modules exists
     if (-not (Test-Path "node_modules")) {
         Write-Host "Installing Node.js dependencies..." -ForegroundColor Yellow
-        npm install
+        try {
+            & npm install
+            if ($LASTEXITCODE -ne 0) {
+                Write-Host "Failed to install Node.js dependencies" -ForegroundColor Red
+                return $false
+            }
+        } catch {
+            Write-Host "Error installing Node.js dependencies: $($_.Exception.Message)" -ForegroundColor Red
+            return $false
+        }
     }
     
     # Start React development server in background
-    Start-Process -FilePath "npm" -ArgumentList "start" -NoNewWindow
-    
-    # Wait a moment for server to start
-    Start-Sleep -Seconds 5
-    
-    Write-Host "Frontend started successfully" -ForegroundColor Green
-    Write-Host "   Open your browser and navigate to: http://localhost:3000" -ForegroundColor Cyan
+    Write-Host "Starting React development server..." -ForegroundColor White
+    try {
+        Start-Process -FilePath "npm" -ArgumentList "start" -NoNewWindow
+        Start-Sleep -Seconds 5
+        Write-Host "Frontend started successfully" -ForegroundColor Green
+        Write-Host "   Open your browser and navigate to: http://localhost:3000" -ForegroundColor Cyan
+        return $true
+    } catch {
+        Write-Host "Failed to start frontend: $($_.Exception.Message)" -ForegroundColor Red
+        Write-Host "You can try starting it manually:" -ForegroundColor Yellow
+        Write-Host "  cd frontend" -ForegroundColor White
+        Write-Host "  npm start" -ForegroundColor White
+        return $false
+    }
 }
 
 # Start services
 $bridgeStarted = Start-BridgeService
 if ($bridgeStarted) {
-    Start-Frontend
+    $frontendStarted = Start-Frontend
     
     Write-Host ""
-    Write-Host "Setup Complete!" -ForegroundColor Green
+    Write-Host "Setup Summary:" -ForegroundColor Green
     Write-Host "==========================================" -ForegroundColor Cyan
     Write-Host "Services running:" -ForegroundColor White
     Write-Host "  - Bridge Service: http://localhost:8000" -ForegroundColor White
-    Write-Host "  - Frontend: http://localhost:3000" -ForegroundColor White
     Write-Host "  - MODBUS Backend: $linuxVMIP:502" -ForegroundColor White
+    if ($frontendStarted) {
+        Write-Host "  - Frontend: http://localhost:3000" -ForegroundColor White
+    } else {
+        Write-Host "  - Frontend: Not started (Node.js not installed)" -ForegroundColor Yellow
+    }
     Write-Host ""
     Write-Host "Press any key to stop all services..." -ForegroundColor Yellow
     $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
