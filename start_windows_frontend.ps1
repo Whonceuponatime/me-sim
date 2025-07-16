@@ -41,6 +41,46 @@ Write-Host "  - Bridge Port: 8000" -ForegroundColor White
 Write-Host "  - Frontend Port: 3000" -ForegroundColor White
 Write-Host ""
 
+# Function to update remote_settings.json
+function Update-RemoteSettings {
+    param($linuxVMIP)
+    
+    Write-Host "Updating frontend configuration..." -ForegroundColor Yellow
+    
+    $settingsFile = "frontend\public\remote_settings.json"
+    if (-not (Test-Path $settingsFile)) {
+        Write-Host "Error: remote_settings.json not found" -ForegroundColor Red
+        return $false
+    }
+    
+    try {
+        # Read current settings
+        $settings = Get-Content $settingsFile | ConvertFrom-Json
+        
+        # Update the IP addresses
+        $settings.apiBaseUrl = "http://localhost:8000/api"
+        $settings.modbusHost = $linuxVMIP
+        $settings.deployment.linuxVM.ip = $linuxVMIP
+        $settings.deployment.windowsVM.ip = "localhost"
+        
+        # Write updated settings back to file
+        $settings | ConvertTo-Json -Depth 10 | Set-Content $settingsFile
+        
+        Write-Host "Updated remote_settings.json with Linux VM IP: $linuxVMIP" -ForegroundColor Green
+        return $true
+    } catch {
+        Write-Host "Error updating remote_settings.json: $($_.Exception.Message)" -ForegroundColor Red
+        return $false
+    }
+}
+
+# Update the configuration file
+$configUpdated = Update-RemoteSettings -linuxVMIP $linuxVMIP
+if (-not $configUpdated) {
+    Write-Host "Warning: Could not update configuration file" -ForegroundColor Yellow
+    Write-Host "Frontend may not connect properly" -ForegroundColor Yellow
+}
+
 # Test connectivity to Linux VM
 Write-Host "Testing connectivity to Linux VM..." -ForegroundColor Yellow
 try {
