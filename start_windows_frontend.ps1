@@ -71,28 +71,66 @@ try {
 
 Write-Host ""
 
+# Function to test Python installation
+function Test-PythonInstallation {
+    Write-Host "Testing Python installation..." -ForegroundColor Yellow
+    
+    # Test virtual environment Python
+    $pythonExe = "venv\Scripts\python.exe"
+    if (Test-Path $pythonExe) {
+        try {
+            $result = & $pythonExe --version 2>$null
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "Virtual environment Python found: $pythonExe" -ForegroundColor Green
+                return $pythonExe
+            }
+        } catch {
+            Write-Host "Virtual environment Python test failed" -ForegroundColor Red
+        }
+    }
+    
+    # Test system Python
+    try {
+        $result = & python --version 2>$null
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "System Python found" -ForegroundColor Green
+            return "python"
+        }
+    } catch {
+        Write-Host "System Python test failed" -ForegroundColor Red
+    }
+    
+    Write-Host "Error: No working Python found" -ForegroundColor Red
+    return $null
+}
+
 # Function to start bridge service
 function Start-BridgeService {
     Write-Host "Starting Bridge Service..." -ForegroundColor Green
     Write-Host "   This will connect to Linux VM at $linuxVMIP:502" -ForegroundColor White
     
+    # Test Python installation
+    $pythonExe = Test-PythonInstallation
+    if (-not $pythonExe) {
+        return $false
+    }
+    
     # Activate virtual environment
     Write-Host "Activating virtual environment..." -ForegroundColor Yellow
     & "venv\Scripts\activate.ps1"
     
-    # Use the virtual environment Python directly
-    $pythonExe = "venv\Scripts\python.exe"
-    if (-not (Test-Path $pythonExe)) {
-        Write-Host "Error: Python not found in virtual environment" -ForegroundColor Red
-        Write-Host "Please ensure virtual environment is properly set up" -ForegroundColor Yellow
-        return $false
+    # Try the simplified bridge script first
+    $bridgeScript = "modbus_bridge_simple.py"
+    if (-not (Test-Path $bridgeScript)) {
+        $bridgeScript = "modbus_bridge.py"
     }
     
-    Write-Host "Using Python: $pythonExe" -ForegroundColor Green
+    Write-Host "Using bridge script: $bridgeScript" -ForegroundColor White
+    Write-Host "Using Python: $pythonExe" -ForegroundColor White
     
     # Start bridge service in background
     Write-Host "Starting bridge service..." -ForegroundColor White
-    Start-Process -FilePath $pythonExe -ArgumentList "modbus_bridge.py", "--modbus-host", $linuxVMIP, "--modbus-port", "502" -NoNewWindow
+    Start-Process -FilePath $pythonExe -ArgumentList $bridgeScript, "--modbus-host", $linuxVMIP, "--modbus-port", "502" -NoNewWindow
     
     # Wait a moment for service to start
     Start-Sleep -Seconds 5
@@ -168,5 +206,5 @@ if ($bridgeStarted) {
     Write-Host "Please check the Linux VM backend is running" -ForegroundColor Yellow
     Write-Host "You can also try running the bridge manually:" -ForegroundColor Yellow
     Write-Host "  venv\Scripts\activate" -ForegroundColor White
-    Write-Host "  venv\Scripts\python.exe modbus_bridge.py --modbus-host $linuxVMIP --modbus-port 502" -ForegroundColor White
+    Write-Host "  venv\Scripts\python.exe modbus_bridge_simple.py --modbus-host $linuxVMIP --modbus-port 502" -ForegroundColor White
 } 
