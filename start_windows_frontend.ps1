@@ -71,32 +71,72 @@ try {
 
 Write-Host ""
 
+# Function to find Python executable
+function Find-PythonExecutable {
+    # Try different Python paths
+    $pythonPaths = @(
+        "python",
+        "python3",
+        "py",
+        "venv\Scripts\python.exe",
+        "venv\Scripts\python"
+    )
+    
+    foreach ($path in $pythonPaths) {
+        try {
+            $result = & $path --version 2>$null
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "Found Python: $path" -ForegroundColor Green
+                return $path
+            }
+        } catch {
+            # Continue to next path
+        }
+    }
+    
+    Write-Host "Error: Could not find Python executable" -ForegroundColor Red
+    Write-Host "Please ensure Python is installed and in PATH" -ForegroundColor Yellow
+    return $null
+}
+
 # Function to start bridge service
 function Start-BridgeService {
     Write-Host "Starting Bridge Service..." -ForegroundColor Green
     Write-Host "   This will connect to Linux VM at $linuxVMIP:502" -ForegroundColor White
     
+    # Find Python executable
+    $pythonExe = Find-PythonExecutable
+    if (-not $pythonExe) {
+        return $false
+    }
+    
     # Activate virtual environment
+    Write-Host "Activating virtual environment..." -ForegroundColor Yellow
     & "venv\Scripts\activate.ps1"
     
     # Start bridge service in background
-    Start-Process -FilePath "python" -ArgumentList "modbus_bridge.py", "--modbus-host", $linuxVMIP, "--modbus-port", "502" -NoNewWindow
+    Write-Host "Starting bridge service with: $pythonExe modbus_bridge.py --modbus-host $linuxVMIP --modbus-port 502" -ForegroundColor White
+    Start-Process -FilePath $pythonExe -ArgumentList "modbus_bridge.py", "--modbus-host", $linuxVMIP, "--modbus-port", "502" -NoNewWindow
     
     # Wait a moment for service to start
-    Start-Sleep -Seconds 3
+    Start-Sleep -Seconds 5
     
     # Test if bridge service is running
     try {
-        $response = Invoke-RestMethod -Uri "http://localhost:8000/api/health" -Method GET -TimeoutSec 5
+        Write-Host "Testing bridge service health..." -ForegroundColor Yellow
+        $response = Invoke-RestMethod -Uri "http://localhost:8000/api/health" -Method GET -TimeoutSec 10
         if ($response.status -eq "healthy") {
             Write-Host "Bridge service started successfully" -ForegroundColor Green
             return $true
         } else {
             Write-Host "Bridge service health check failed" -ForegroundColor Red
+            Write-Host "Response: $($response | ConvertTo-Json)" -ForegroundColor Yellow
             return $false
         }
     } catch {
         Write-Host "Could not connect to bridge service" -ForegroundColor Red
+        Write-Host "Error: $($_.Exception.Message)" -ForegroundColor Yellow
+        Write-Host "Please check if the service started properly" -ForegroundColor Yellow
         return $false
     }
 }
@@ -150,4 +190,7 @@ if ($bridgeStarted) {
 } else {
     Write-Host "Failed to start bridge service" -ForegroundColor Red
     Write-Host "Please check the Linux VM backend is running" -ForegroundColor Yellow
+    Write-Host "You can also try running the bridge manually:" -ForegroundColor Yellow
+    Write-Host "  venv\Scripts\activate" -ForegroundColor White
+    Write-Host "  python modbus_bridge.py --modbus-host $linuxVMIP --modbus-port 502" -ForegroundColor White
 } 
