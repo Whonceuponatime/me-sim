@@ -107,6 +107,64 @@ class ModbusBridge:
         finally:
             self.client.close()
 
+    def start_engine(self):
+        """Send start command to MODBUS backend"""
+        try:
+            print(f"MODBUS TCP START: Bridge -> {self.modbus_host}:{self.modbus_port}")
+            
+            if not self.client.open():
+                raise Exception(f"Cannot connect to MODBUS backend at {self.modbus_host}:{self.modbus_port}")
+            
+            # Write 1 to status register to start engine
+            success = self.client.write_single_register(self.registers['status'], 1)
+            print(f"MODBUS Write: Register {self.registers['status']} = 1 (START)")
+            
+            if success:
+                print("START command sent successfully via MODBUS TCP")
+                return {
+                    "status": "success", 
+                    "command": "start", 
+                    "message": "Engine start command sent",
+                    "modbus_target": f"{self.modbus_host}:{self.modbus_port}"
+                }
+            else:
+                raise Exception("Failed to send start command")
+                
+        except Exception as e:
+            print(f"START command error: {e}")
+            raise e
+        finally:
+            self.client.close()
+
+    def stop_engine(self):
+        """Send stop command to MODBUS backend"""
+        try:
+            print(f"MODBUS TCP STOP: Bridge -> {self.modbus_host}:{self.modbus_port}")
+            
+            if not self.client.open():
+                raise Exception(f"Cannot connect to MODBUS backend at {self.modbus_host}:{self.modbus_port}")
+            
+            # Write 0 to status register to stop engine
+            success = self.client.write_single_register(self.registers['status'], 0)
+            print(f"MODBUS Write: Register {self.registers['status']} = 0 (STOP)")
+            
+            if success:
+                print("STOP command sent successfully via MODBUS TCP")
+                return {
+                    "status": "success", 
+                    "command": "stop", 
+                    "message": "Engine stop command sent",
+                    "modbus_target": f"{self.modbus_host}:{self.modbus_port}"
+                }
+            else:
+                raise Exception("Failed to send stop command")
+                
+        except Exception as e:
+            print(f"STOP command error: {e}")
+            raise e
+        finally:
+            self.client.close()
+
 # Global bridge instance
 bridge = None
 
@@ -131,6 +189,34 @@ async def get_engine_status():
 async def get_engine_data():
     """Get engine data (alias for /api/status)"""
     return await get_engine_status()
+
+@app.post("/api/engine/start")
+async def start_engine():
+    """Send start command to MODBUS backend"""
+    global bridge
+    
+    if bridge is None:
+        raise HTTPException(status_code=503, detail="Bridge not initialized")
+    
+    try:
+        result = bridge.start_engine()
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error sending start command: {e}")
+
+@app.post("/api/engine/stop")
+async def stop_engine():
+    """Send stop command to MODBUS backend"""
+    global bridge
+    
+    if bridge is None:
+        raise HTTPException(status_code=503, detail="Bridge not initialized")
+    
+    try:
+        result = bridge.stop_engine()
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error sending stop command: {e}")
 
 @app.get("/api/health")
 async def health_check():
