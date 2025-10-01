@@ -134,6 +134,9 @@ class StandaloneEngineSimulator:
         self.http_server = None
         self.http_thread = None
         
+        # MODBUS security monitoring
+        self._last_modbus_status = None
+        
         # Initialize registers to default values
         self._initialize_registers()
         
@@ -321,46 +324,52 @@ class StandaloneEngineSimulator:
             if current_status:
                 status_value = current_status[0]
                 
-                # Check if status was changed externally to stop the engine
-                if status_value == 0 and self._running:
-                    print("\n" + "!"*80)
-                    print("!!! UNAUTHORIZED MODBUS COMMAND DETECTED !!!")
-                    print("!!! EXTERNAL CLIENT SENT STOP COMMAND !!!")
-                    print("!!! THIS DEMONSTRATES A SECURITY VULNERABILITY !!!")
-                    print("!"*80)
-                    
-                    # Log security event
-                    security_event = {
-                        'timestamp': datetime.now().isoformat(),
-                        'event': 'UNAUTHORIZED_STOP_COMMAND',
-                        'description': 'External MODBUS client sent engine stop command',
-                        'risk_level': 'CRITICAL'
-                    }
-                    self.security_events.append(security_event)
-                    self.unauthorized_attempts += 1
-                    
-                    # Emergency stop the engine
-                    self._emergency_stop()
-                    
-                # Check if status was changed externally to start the engine
-                elif status_value == 1 and not self._running:
-                    print("\n" + "!"*60)
-                    print("!!! UNAUTHORIZED START COMMAND DETECTED !!!")
-                    print("!!! EXTERNAL CLIENT SENT START COMMAND !!!")
-                    print("!"*60)
-                    
-                    # Log security event
-                    security_event = {
-                        'timestamp': datetime.now().isoformat(),
-                        'event': 'UNAUTHORIZED_START_COMMAND',
-                        'description': 'External MODBUS client sent engine start command',
-                        'risk_level': 'HIGH'
-                    }
-                    self.security_events.append(security_event)
-                    
-                    # Start the engine (demonstrate vulnerability)
-                    self._running = True
-                    print("Engine started by external command (vulnerability demonstrated)")
+                # Only check for unauthorized commands if the status was changed externally via MODBUS
+                # Don't trigger security alerts for internal HTTP API changes
+                if hasattr(self, '_last_modbus_status'):
+                    if self._last_modbus_status != status_value:
+                        # Status was changed via MODBUS (external command)
+                        if status_value == 0 and self._running:
+                            print("\n" + "!"*80)
+                            print("!!! UNAUTHORIZED MODBUS COMMAND DETECTED !!!")
+                            print("!!! EXTERNAL CLIENT SENT STOP COMMAND !!!")
+                            print("!!! THIS DEMONSTRATES A SECURITY VULNERABILITY !!!")
+                            print("!"*80)
+                            
+                            # Log security event
+                            security_event = {
+                                'timestamp': datetime.now().isoformat(),
+                                'event': 'UNAUTHORIZED_STOP_COMMAND',
+                                'description': 'External MODBUS client sent engine stop command',
+                                'risk_level': 'CRITICAL'
+                            }
+                            self.security_events.append(security_event)
+                            self.unauthorized_attempts += 1
+                            
+                            # Emergency stop the engine
+                            self._emergency_stop()
+                            
+                        elif status_value == 1 and not self._running:
+                            print("\n" + "!"*60)
+                            print("!!! UNAUTHORIZED START COMMAND DETECTED !!!")
+                            print("!!! EXTERNAL CLIENT SENT START COMMAND !!!")
+                            print("!"*60)
+                            
+                            # Log security event
+                            security_event = {
+                                'timestamp': datetime.now().isoformat(),
+                                'event': 'UNAUTHORIZED_START_COMMAND',
+                                'description': 'External MODBUS client sent engine start command',
+                                'risk_level': 'HIGH'
+                            }
+                            self.security_events.append(security_event)
+                            
+                            # Start the engine (demonstrate vulnerability)
+                            self._running = True
+                            print("Engine started by external command (vulnerability demonstrated)")
+                
+                # Update the last known MODBUS status
+                self._last_modbus_status = status_value
                     
         except Exception as e:
             print(f"Error checking external commands: {e}")
