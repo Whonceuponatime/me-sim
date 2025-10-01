@@ -1,5 +1,5 @@
 #!/bin/bash
-# Linux startup script for MODBUS TCP Backend
+# Simple Linux startup script for MODBUS TCP Backend
 # This script runs the backend on Linux VM (192.168.20.192)
 
 echo "=========================================="
@@ -7,6 +7,7 @@ echo "Starting MODBUS TCP Backend on Linux"
 echo "=========================================="
 echo "Backend IP: 192.168.20.192"
 echo "Backend Port: 502"
+echo "HTTP API Port: 8080"
 echo "Frontend IP: 192.168.20.100"
 echo "=========================================="
 
@@ -39,25 +40,11 @@ echo "MODBUS server will listen on 0.0.0.0:502 (all interfaces)"
 echo "HTTP API will listen on 0.0.0.0:8080 (all interfaces)"
 echo "Frontend can connect from 192.168.20.100"
 echo ""
-echo "Starting MODBUS traffic generator to create network packets..."
-echo "Monitor with Wireshark filter: tcp.port == 502"
-echo ""
 echo "Press Ctrl+C to stop the server"
 echo "=========================================="
 
-# Start the backend in background
-python3 standalone_backend.py --host 0.0.0.0 --port 502 &
-BACKEND_PID=$!
-
-# Wait a moment for backend to start
-sleep 3
-
-# Start the traffic generator (connect to localhost since backend is on same machine)
-python3 modbus_traffic_generator.py --host 127.0.0.1 --port 502 &
-TRAFFIC_PID=$!
-
-# Wait for both processes
-wait $BACKEND_PID $TRAFFIC_PID
+# Run the backend directly (not in background)
+python3 standalone_backend.py --host 0.0.0.0 --port 502
 
 echo ""
 echo "Backend stopped."
