@@ -285,7 +285,7 @@ class StandaloneEngineSimulator:
         print("Simulation loop ended")
     
     def _generate_modbus_traffic(self):
-        """Generate continuous MODBUS TCP traffic by updating registers"""
+        """Update MODBUS registers with current engine values"""
         try:
             # Update all registers with current engine values
             registers = self.config['registers']
@@ -305,7 +305,7 @@ class StandaloneEngineSimulator:
                     else:
                         value = 0
                     
-                    # Update the register - this generates MODBUS packets when clients read
+                    # Update the register
                     self.server.data_bank.set_holding_registers(reg_addr, [value])
                     print(f"📡 MODBUS TX: {reg_name.upper()} = {value} (Register {reg_addr})")
                     

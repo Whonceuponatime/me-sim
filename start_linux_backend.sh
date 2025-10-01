@@ -39,11 +39,25 @@ echo "MODBUS server will listen on 0.0.0.0:502 (all interfaces)"
 echo "HTTP API will listen on 0.0.0.0:8080 (all interfaces)"
 echo "Frontend can connect from 192.168.20.100"
 echo ""
+echo "Starting MODBUS traffic generator to create network packets..."
+echo "Monitor with Wireshark filter: tcp.port == 502"
+echo ""
 echo "Press Ctrl+C to stop the server"
 echo "=========================================="
 
-# Run the backend
-python3 standalone_backend.py --host 0.0.0.0 --port 502
+# Start the backend in background
+python3 standalone_backend.py --host 0.0.0.0 --port 502 &
+BACKEND_PID=$!
+
+# Wait a moment for backend to start
+sleep 3
+
+# Start the traffic generator
+python3 modbus_traffic_generator.py --host 192.168.20.192 --port 502 &
+TRAFFIC_PID=$!
+
+# Wait for both processes
+wait $BACKEND_PID $TRAFFIC_PID
 
 echo ""
 echo "Backend stopped."
