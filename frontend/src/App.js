@@ -59,14 +59,17 @@ const getAPIConfig = async () => {
     const response = await fetch('/remote_settings.json');
     if (response.ok) {
       const settings = await response.json();
+      console.log('Loaded settings:', settings);
       return {
         apiBaseUrl: settings.apiBaseUrl,
         dataUpdateInterval: settings.dataUpdateInterval || 2000,
         useRestAPI: settings.deployment?.dataSource === 'rest_api' || settings.websocketUrl === null
       };
+    } else {
+      console.error('Failed to load remote_settings.json:', response.status);
     }
   } catch (error) {
-    console.log('Could not load API config from remote_settings.json');
+    console.error('Could not load API config from remote_settings.json:', error);
   }
   
   return {
@@ -263,10 +266,16 @@ function App() {
 
   // REST API functions for bridge mode (moved before useEffect)
   const fetchEngineData = useCallback(async () => {
-    if (!apiConfig.apiBaseUrl) return;
+    if (!apiConfig.apiBaseUrl) {
+      console.warn('No API base URL configured');
+      return;
+    }
 
     try {
+      console.log('Fetching from:', `${apiConfig.apiBaseUrl}/status`);
       const response = await fetch(`${apiConfig.apiBaseUrl}/status`);
+      console.log('Response status:', response.status);
+      
       if (response.ok) {
         const data = await response.json();
         console.log('API data received:', data);
@@ -299,7 +308,7 @@ function App() {
           });
         }
       } else {
-        console.error('API request failed:', response.status);
+        console.error('API request failed:', response.status, response.statusText);
         setApiConnected(false);
       }
     } catch (error) {
