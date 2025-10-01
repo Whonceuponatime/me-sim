@@ -22,7 +22,7 @@ class StandaloneEngineSimulator:
         
         # Load configuration
         if config_file is None:
-            config_file = Path(__file__).parent / 'config.yaml'
+            config_file = Path(__file__).parent / 'config_linux.yaml'
         
         try:
             with open(config_file, 'r') as f:
@@ -411,7 +411,7 @@ def main():
     parser = argparse.ArgumentParser(description='Standalone MODBUS TCP Engine Simulator')
     parser.add_argument('--host', default='0.0.0.0', help='MODBUS server host (default: 0.0.0.0)')
     parser.add_argument('--port', type=int, default=502, help='MODBUS server port (default: 502)')
-    parser.add_argument('--config', help='Path to configuration file (default: config.yaml)')
+    parser.add_argument('--config', help='Path to configuration file (default: config_linux.yaml)')
     
     args = parser.parse_args()
     

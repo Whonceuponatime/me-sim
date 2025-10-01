@@ -2,7 +2,7 @@
 # This file configures the standalone MODBUS TCP server
 
 modbus:
-  host: "0.0.0.0"  # Listen on all network interfaces
+  host: "192.168.20.192"  # Static backend IP
   port: 502         # Standard MODBUS TCP port
 
 engine:
@@ -32,7 +32,7 @@ security:
 
 # Network settings for two-VM setup
 network:
-  bind_address: "0.0.0.0"  # Allow connections from any IP
+  bind_address: "192.168.20.192"  # Static backend IP
   port: 502                 # Standard MODBUS port
   max_connections: 10       # Maximum concurrent connections
   connection_timeout: 30    # Connection timeout in seconds

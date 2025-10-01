@@ -5,8 +5,8 @@
   "_ARCHITECTURE": "VM: Linux (standalone_backend.py MODBUS) + Windows (modbus_bridge.py REST API + Frontend)",
   
   "websocketUrl": null,
-  "apiBaseUrl": "http://localhost:8000/api",
-  "modbusHost": "192.168.62.134",
+  "apiBaseUrl": "http://192.168.20.100:8000/api",
+  "modbusHost": "192.168.20.192",
   "modbusPort": 502,
   
   "reconnectDelay": 1000,
@@ -46,12 +46,12 @@
     "backendType": "modbus_with_bridge",
     "dataSource": "rest_api",
     "linuxVM": {
-      "ip": "192.168.62.134",
+      "ip": "192.168.20.192",
       "role": "backend",
       "services": ["standalone_backend.py (MODBUS TCP)"]
     },
     "windowsVM": {
-      "ip": "localhost",
+      "ip": "192.168.20.100",
       "role": "frontend",
       "services": ["modbus_bridge.py (REST API)", "React Frontend"]
     },

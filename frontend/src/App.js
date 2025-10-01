@@ -5,7 +5,7 @@ import {
   TableHead, TableRow, Alert, Tab, Tabs, Box,
   Card, CardContent, CardHeader, Divider,
   AppBar, Toolbar, LinearProgress,
-  createTheme, ThemeProvider
+  createTheme, ThemeProvider, Chip
 } from '@mui/material';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import GaugeChart from 'react-gauge-chart';
@@ -19,6 +19,9 @@ import PowerSettingsNewIcon from '@mui/icons-material/PowerSettingsNew';
 import SpeedIcon from '@mui/icons-material/Speed';
 import ThermostatIcon from '@mui/icons-material/Thermostat';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import EngineeringIcon from '@mui/icons-material/Engineering';
+import SettingsIcon from '@mui/icons-material/Settings';
+import MonitorIcon from '@mui/icons-material/Monitor';
 
 // Dynamic WebSocket URL configuration
 const getWebSocketURL = async () => {
@@ -122,15 +125,15 @@ const SENSOR_CONFIG = {
   }
 };
 
-// Create dark theme for marine look
-const darkTheme = createTheme({
+// Create industrial grey theme
+const industrialTheme = createTheme({
   palette: {
     mode: 'dark',
     primary: {
-      main: '#00ff00',
+      main: '#ffffff',
     },
     secondary: {
-      main: '#ff9800',
+      main: '#00ff00',
     },
     background: {
       default: '#1a1a1a',
@@ -138,7 +141,19 @@ const darkTheme = createTheme({
     },
     text: {
       primary: '#ffffff',
-      secondary: '#b0b0b0',
+      secondary: '#cccccc',
+    },
+    grey: {
+      50: '#fafafa',
+      100: '#f5f5f5',
+      200: '#eeeeee',
+      300: '#e0e0e0',
+      400: '#bdbdbd',
+      500: '#9e9e9e',
+      600: '#757575',
+      700: '#616161',
+      800: '#424242',
+      900: '#212121',
     },
   },
   components: {
@@ -146,17 +161,37 @@ const darkTheme = createTheme({
       styleOverrides: {
         root: {
           backgroundColor: '#2d2d2d',
-          border: '1px solid #404040',
+          border: '1px solid #424242',
           borderRadius: 8,
+          boxShadow: '0 4px 8px rgba(0,0,0,0.3)',
         },
       },
     },
     MuiButton: {
       styleOverrides: {
         root: {
-          borderRadius: 8,
+          borderRadius: 4,
           textTransform: 'none',
           fontWeight: 600,
+          border: '1px solid #424242',
+        },
+      },
+    },
+    MuiAppBar: {
+      styleOverrides: {
+        root: {
+          backgroundColor: '#1a1a1a',
+          borderBottom: '2px solid #424242',
+        },
+      },
+    },
+    MuiTab: {
+      styleOverrides: {
+        root: {
+          color: '#cccccc',
+          '&.Mui-selected': {
+            color: '#ffffff',
+          },
         },
       },
     },
@@ -637,91 +672,154 @@ function App() {
   };
 
   return (
-    <ThemeProvider theme={darkTheme}>
+    <ThemeProvider theme={industrialTheme}>
     <Box sx={{ 
       minHeight: '100vh',
-        backgroundColor: '#1a1a1a',
-        pt: 2
+      backgroundColor: '#1a1a1a',
+      backgroundImage: 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)',
+      pt: 0
     }}>
-        <AppBar position="static" sx={{ backgroundColor: '#1a1a1a', mb: 3 }}>
-        <Toolbar>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexGrow: 1 }}>
-              <img src={logo} alt="Engine Control System Logo" style={{ height: 40 }} />
-              <Typography variant="h6" sx={{ flexGrow: 1 }}>
-                Engine Control System
-              </Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mr: 4 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+        <AppBar position="static" sx={{ backgroundColor: '#1a1a1a', mb: 0, borderBottom: '2px solid #424242' }}>
+        <Toolbar sx={{ minHeight: '80px !important' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 3, flexGrow: 1 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <EngineeringIcon sx={{ fontSize: 40, color: '#00ff00' }} />
+                <Typography variant="h5" sx={{ fontWeight: 'bold', color: '#ffffff' }}>
+                  ENGINE MONITORING SYSTEM
+                </Typography>
+              </Box>
+              
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, ml: 4 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <Box 
                     className="status-indicator"
                     sx={{ 
-                      width: 12,
-                      height: 12,
+                      width: 16,
+                      height: 16,
                       borderRadius: '50%',
                       backgroundColor: engineData.status === 1 ? '#00ff00' : '#ff0000',
-                      boxShadow: engineData.status === 1 ? '0 0 10px #00ff00' : '0 0 10px #ff0000',
-                      mr: 1
+                      boxShadow: engineData.status === 1 ? '0 0 15px #00ff00' : '0 0 15px #ff0000',
+                      border: '2px solid #ffffff'
                     }} 
                   />
-                  <Typography variant="body2" sx={{ color: engineData.status === 1 ? '#00ff00' : '#ff0000' }}>
+                  <Typography variant="body1" sx={{ 
+                    color: engineData.status === 1 ? '#00ff00' : '#ff0000',
+                    fontWeight: 'bold',
+                    fontSize: '14px'
+                  }}>
                     {engineData.status === 1 ? 'ENGINE RUNNING' : 'ENGINE STOPPED'}
                   </Typography>
                 </Box>
+                
+                <Chip 
+                  icon={<SettingsIcon />}
+                  label={plcData.mode}
+                  sx={{ 
+                    backgroundColor: '#424242',
+                    color: '#ffffff',
+                    border: '1px solid #666666',
+                    fontWeight: 'bold'
+                  }}
+                />
+              </Box>
+              
               <Button 
                 variant="contained" 
-                  color={engineData.status === 1 ? "error" : "primary"}
+                color={engineData.status === 1 ? "error" : "primary"}
                 size="large"
-                  onClick={() => sendCommand(engineData.status === 1 ? 'stop_engine' : 'start_engine')}
+                onClick={() => sendCommand(engineData.status === 1 ? 'stop_engine' : 'start_engine')}
                 sx={{ 
-                    minWidth: 150,
-                    height: 48,
-                    fontSize: '1rem'
-                  }}
-                >
-                  {engineData.status === 1 ? 'EMERGENCY STOP' : 'START ENGINE'}
+                  minWidth: 180,
+                  height: 50,
+                  fontSize: '1rem',
+                  fontWeight: 'bold',
+                  backgroundColor: engineData.status === 1 ? '#d32f2f' : '#2e7d32',
+                  '&:hover': {
+                    backgroundColor: engineData.status === 1 ? '#b71c1c' : '#1b5e20'
+                  }
+                }}
+                startIcon={engineData.status === 1 ? <PowerSettingsNewIcon /> : <PowerSettingsNewIcon />}
+              >
+                {engineData.status === 1 ? 'EMERGENCY STOP' : 'START ENGINE'}
               </Button>
-              </Box>
-              <Tabs value={currentTab} onChange={handleTabChange} textColor="inherit">
-                <Tab label="Dashboard" />
-                <Tab label="Topology" />
-                <Tab label="Trends" />
+              
+              <Tabs value={currentTab} onChange={handleTabChange} textColor="inherit" sx={{ ml: 4 }}>
+                <Tab label="DASHBOARD" icon={<MonitorIcon />} iconPosition="start" />
+                <Tab label="TOPOLOGY" icon={<EngineeringIcon />} iconPosition="start" />
+                <Tab label="TRENDS" icon={<SpeedIcon />} iconPosition="start" />
               </Tabs>
           </Box>
         </Toolbar>
       </AppBar>
 
         {(!wsConnected && !useRestAPI) && (
-          <Alert severity="error" sx={{ mb: 3 }}>
+          <Alert severity="error" sx={{ mb: 3, mx: 2, mt: 2 }}>
             WebSocket connection lost. Attempting to reconnect...
           </Alert>
         )}
 
         {(!apiConnected && useRestAPI) && (
-          <Alert severity="error" sx={{ mb: 3 }}>
+          <Alert severity="error" sx={{ mb: 3, mx: 2, mt: 2 }}>
             API connection failed. Check if bridge service is running.
           </Alert>
         )}
 
         {(useRestAPI && apiConnected) && (
-          <Alert severity="info" sx={{ mb: 3 }}>
+          <Alert severity="info" sx={{ mb: 3, mx: 2, mt: 2 }}>
             Connected to MODBUS bridge API
           </Alert>
         )}
 
-        <Container maxWidth="xl">
+        <Container maxWidth="xl" sx={{ mt: 3 }}>
           {currentTab === 0 && (
             <Grid container spacing={3}>
+              {/* Engine Blueprint Background */}
+              <Grid item xs={12}>
+                <Card sx={{ 
+                  height: 300, 
+                  backgroundImage: 'url(/engine-blueprint.svg)',
+                  backgroundSize: 'contain',
+                  backgroundPosition: 'center',
+                  backgroundRepeat: 'no-repeat',
+                  backgroundColor: '#1a1a1a',
+                  border: '2px solid #424242',
+                  position: 'relative',
+                  overflow: 'hidden'
+                }}>
+                  <Box sx={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: 'linear-gradient(135deg, rgba(26,26,26,0.8) 0%, rgba(45,45,45,0.6) 100%)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    <Typography variant="h4" sx={{ 
+                      color: '#ffffff', 
+                      fontWeight: 'bold',
+                      textShadow: '2px 2px 4px rgba(0,0,0,0.8)'
+                    }}>
+                      ENGINE MONITORING SYSTEM
+                    </Typography>
+                  </Box>
+                </Card>
+              </Grid>
+
               {/* Main Engine Status Panel */}
               <Grid item xs={12} md={6}>
-                <Card sx={{ height: '100%' }}>
+                <Card sx={{ height: '100%', border: '2px solid #424242' }}>
                   <CardHeader 
                     title={
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                        <Typography variant="h6">ENGINE STATUS</Typography>
+                        <EngineeringIcon sx={{ color: '#00ff00', fontSize: 28 }} />
+                        <Typography variant="h6" sx={{ color: '#ffffff', fontWeight: 'bold' }}>ENGINE STATUS</Typography>
                         <Box 
-            sx={{ 
-                            width: 10, 
-                            height: 10, 
+                          sx={{ 
+                            width: 12, 
+                            height: 12, 
                             borderRadius: '50%',
                             backgroundColor: engineData.status === 1 ? '#00ff00' : '#ff0000',
                             boxShadow: engineData.status === 1 ? '0 0 10px #00ff00' : '0 0 10px #ff0000'
@@ -729,20 +827,31 @@ function App() {
                         />
                       </Box>
                     }
+                    sx={{ 
+                      backgroundColor: '#424242',
+                      borderBottom: '2px solid #666666'
+                    }}
                   />
-                  <CardContent>
+                  <CardContent sx={{ backgroundColor: '#2d2d2d' }}>
                     <Box sx={{ mb: 4 }}>
-                      <Typography variant="body2" color="textSecondary" gutterBottom>
+                      <Typography variant="body2" color="textSecondary" gutterBottom sx={{ fontWeight: 'bold' }}>
                         OPERATION MODE
                       </Typography>
-                      <Typography variant="h6" sx={{ color: '#00ff00' }}>
-                        {plcData.mode}
-                      </Typography>
+                      <Chip 
+                        label={plcData.mode}
+                        sx={{ 
+                          backgroundColor: '#424242',
+                          color: '#00ff00',
+                          fontWeight: 'bold',
+                          fontSize: '16px',
+                          height: '32px'
+                        }}
+                      />
                     </Box>
                     <Grid container spacing={2}>
                       <Grid item xs={4}>
                         <Box sx={{ textAlign: 'center', mb: 1 }}>
-                          <Typography variant="h6" sx={{ color: 'textSecondary' }}>ENGINE RPM</Typography>
+                          <Typography variant="h6" sx={{ color: '#cccccc', fontWeight: 'bold' }}>ENGINE RPM</Typography>
                         </Box>
                         <AnimatedGauge
                           id="rpm-gauge"
@@ -751,7 +860,7 @@ function App() {
                           label="RPM"
                           formatValue={(value) => `${value.toFixed(0)} RPM`}
                           colors={['#00ff00', '#ffff00', '#ff0000']}
-                          textColor="#00ffff"
+                          textColor="#ffffff"
                           needleColor="#ffffff"
                           fontSize="28px"
                           fontWeight="bold"
@@ -759,7 +868,7 @@ function App() {
                       </Grid>
                       <Grid item xs={4}>
                         <Box sx={{ textAlign: 'center', mb: 1 }}>
-                          <Typography variant="h6" sx={{ color: 'textSecondary' }}>ENGINE TEMP</Typography>
+                          <Typography variant="h6" sx={{ color: '#cccccc', fontWeight: 'bold' }}>ENGINE TEMP</Typography>
                         </Box>
                         <AnimatedGauge
                           id="temp-gauge"
@@ -768,7 +877,7 @@ function App() {
                           label="TEMPERATURE"
                           formatValue={(value) => `${value.toFixed(1)}°C`}
                           colors={['#00ff00', '#ffff00', '#ff0000']}
-                          textColor="#00ffff"
+                          textColor="#ffffff"
                           needleColor="#ffffff"
                           fontSize="28px"
                           fontWeight="bold"
@@ -776,8 +885,8 @@ function App() {
                       </Grid>
                       <Grid item xs={4}>
                         <Box sx={{ textAlign: 'center', mb: 1 }}>
-                          <Typography variant="h6" sx={{ color: 'textSecondary' }}>ENGINE LOAD</Typography>
-        </Box>
+                          <Typography variant="h6" sx={{ color: '#cccccc', fontWeight: 'bold' }}>ENGINE LOAD</Typography>
+                        </Box>
                         <AnimatedGauge
                           id="load-gauge"
                           value={engineData.load}
@@ -785,7 +894,7 @@ function App() {
                           label="LOAD"
                           formatValue={(value) => `${value.toFixed(0)}%`}
                           colors={['#00ff00', '#ffff00', '#ff0000']}
-                          textColor="#00ffff"
+                          textColor="#ffffff"
                           needleColor="#ffffff"
                           fontSize="28px"
                           fontWeight="bold"
@@ -800,16 +909,17 @@ function App() {
                         alignItems: 'center', 
                         gap: 1, 
                         mb: 2,
-                        borderBottom: '1px solid #404040',
+                        borderBottom: '2px solid #424242',
                         pb: 1
                       }}>
                         {plcData.alarms.length > 0 ? 
-                          <ErrorIcon sx={{ color: '#ff0000' }} /> : 
-                          <CheckCircleIcon sx={{ color: '#00ff00' }} />
+                          <ErrorIcon sx={{ color: '#ff0000', fontSize: 28 }} /> : 
+                          <CheckCircleIcon sx={{ color: '#00ff00', fontSize: 28 }} />
                         }
                         <Typography variant="subtitle1" sx={{ 
                           color: plcData.alarms.length > 0 ? '#ff0000' : '#00ff00',
-                          fontWeight: 500
+                          fontWeight: 'bold',
+                          fontSize: '16px'
                         }}>
                           ENGINE ALARMS
                         </Typography>
@@ -829,35 +939,37 @@ function App() {
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: 1,
-                                p: 1,
+                                p: 1.5,
                                 backgroundColor: 'rgba(255, 0, 0, 0.1)',
                                 border: '1px solid #ff0000',
-                                borderRadius: 1
+                                borderRadius: 2,
+                                borderLeft: '4px solid #ff0000'
                               }}
                             >
                               {getAlarmIcon(alarm)}
-                        <Typography 
+                              <Typography 
                                 variant="body2" 
-                          sx={{ 
+                                sx={{ 
                                   color: '#ff0000',
-                            fontWeight: 500,
+                                  fontWeight: 'bold',
                                   flex: 1
-                          }}
-                        >
+                                }}
+                              >
                                 {alarm}
-                        </Typography>
+                              </Typography>
                             </Box>
                           ))
                         ) : (
                           <Box
                             sx={{
-                          display: 'flex',
-                          alignItems: 'center',
+                              display: 'flex',
+                              alignItems: 'center',
                               gap: 1,
-                              p: 1,
+                              p: 1.5,
                               backgroundColor: 'rgba(0, 255, 0, 0.1)',
                               border: '1px solid #00ff00',
-                              borderRadius: 1
+                              borderRadius: 2,
+                              borderLeft: '4px solid #00ff00'
                             }}
                           >
                             <CheckCircleIcon sx={{ color: '#00ff00' }} />
@@ -865,7 +977,7 @@ function App() {
                               variant="body2" 
                               sx={{ 
                                 color: '#00ff00',
-                                fontWeight: 500
+                                fontWeight: 'bold'
                               }}
                             >
                               NO ACTIVE ALARMS
@@ -878,99 +990,127 @@ function App() {
                             sx={{ 
                               color: '#ff0000',
                               textAlign: 'center',
-                              mt: 1
+                              mt: 1,
+                              fontWeight: 'bold'
                             }}
                           >
                             +{plcData.alarms.length - 3} more alarms
                           </Typography>
                         )}
                       </Box>
-                        </Box>
-                      </CardContent>
-                    </Card>
-            </Grid>
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
 
               {/* Performance Trends */}
-            <Grid item xs={12} md={6}>
-                <Card>
-                  <CardHeader title="PERFORMANCE TRENDS" />
-                <CardContent>
+              <Grid item xs={12} md={6}>
+                <Card sx={{ border: '2px solid #424242' }}>
+                  <CardHeader 
+                    title={
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <SpeedIcon sx={{ color: '#00ff00', fontSize: 28 }} />
+                        <Typography variant="h6" sx={{ color: '#ffffff', fontWeight: 'bold' }}>PERFORMANCE TRENDS</Typography>
+                      </Box>
+                    }
+                    sx={{ 
+                      backgroundColor: '#424242',
+                      borderBottom: '2px solid #666666'
+                    }}
+                  />
+                  <CardContent sx={{ backgroundColor: '#2d2d2d' }}>
                     <Box sx={{ height: 400 }}>
                       <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={engineData.history}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#404040" />
+                        <LineChart data={engineData.history}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#424242" />
                           <XAxis 
                             dataKey="time" 
-                            stroke="#b0b0b0"
-                            tick={{ fill: '#b0b0b0' }}
+                            stroke="#cccccc"
+                            tick={{ fill: '#cccccc' }}
                           />
                           <YAxis 
                             yAxisId="left" 
-                            stroke="#b0b0b0"
-                            tick={{ fill: '#b0b0b0' }}
+                            stroke="#cccccc"
+                            tick={{ fill: '#cccccc' }}
                           />
                           <YAxis 
                             yAxisId="right" 
                             orientation="right" 
-                            stroke="#b0b0b0"
-                            tick={{ fill: '#b0b0b0' }}
+                            stroke="#cccccc"
+                            tick={{ fill: '#cccccc' }}
                           />
-                      <Tooltip 
-                        contentStyle={{ 
+                          <Tooltip 
+                            contentStyle={{ 
                               backgroundColor: '#2d2d2d',
-                              border: '1px solid #404040',
-                              borderRadius: 8
-                        }}
-                      />
-                      <Legend />
-                      <Line 
-                        yAxisId="left"
-                        type="monotone" 
-                        dataKey="rpm" 
+                              border: '2px solid #424242',
+                              borderRadius: 8,
+                              color: '#ffffff'
+                            }}
+                          />
+                          <Legend />
+                          <Line 
+                            yAxisId="left"
+                            type="monotone" 
+                            dataKey="rpm" 
                             stroke="#00ff00"
-                        name="RPM"
+                            strokeWidth={3}
+                            name="RPM"
                           />
                           <Line
                             yAxisId="left"
                             type="monotone"
                             dataKey="temperature"
                             stroke="#ff9800"
+                            strokeWidth={3}
                             name="Temperature (°C)"
-                      />
-                      <Line 
-                        yAxisId="right"
-                        type="monotone" 
-                        dataKey="load" 
-                            stroke="#29b6f6"
-                            name="Load (%)"
-                      />
-                      <Line 
+                          />
+                          <Line 
                             yAxisId="right"
-                        type="monotone" 
-                        dataKey="exhaust_temp" 
+                            type="monotone" 
+                            dataKey="load" 
+                            stroke="#29b6f6"
+                            strokeWidth={3}
+                            name="Load (%)"
+                          />
+                          <Line 
+                            yAxisId="right"
+                            type="monotone" 
+                            dataKey="exhaust_temp" 
                             stroke="#f44336"
+                            strokeWidth={3}
                             name="Exhaust Temp (°C)"
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
                     </Box>
-                </CardContent>
-              </Card>
-            </Grid>
+                  </CardContent>
+                </Card>
+              </Grid>
 
               {/* Auxiliary Systems */}
               <Grid item xs={12} md={9}>
-                <Card sx={{ height: '100%', minHeight: 400 }}>
-                  <CardHeader title="AUXILIARY SYSTEMS" />
-                <CardContent>
-                  <Grid container spacing={3}>
+                <Card sx={{ height: '100%', minHeight: 400, border: '2px solid #424242' }}>
+                  <CardHeader 
+                    title={
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <SettingsIcon sx={{ color: '#00ff00', fontSize: 28 }} />
+                        <Typography variant="h6" sx={{ color: '#ffffff', fontWeight: 'bold' }}>AUXILIARY SYSTEMS</Typography>
+                      </Box>
+                    }
+                    sx={{ 
+                      backgroundColor: '#424242',
+                      borderBottom: '2px solid #666666'
+                    }}
+                  />
+                  <CardContent sx={{ backgroundColor: '#2d2d2d' }}>
+                    <Grid container spacing={3}>
                       {Object.entries(SENSOR_CONFIG).map(([key, config]) => (
                         <Grid item xs={12} sm={6} md={3} key={key}>
                           <Box sx={{ mb: 2 }}>
-                            <Typography variant="body2" color="textSecondary" gutterBottom>
+                            <Typography variant="body2" color="textSecondary" gutterBottom sx={{ fontWeight: 'bold' }}>
                               {key.split('_').map(word => word.toUpperCase()).join(' ')}
                             </Typography>
-                            <Box sx={{ position: 'relative', height: 6, backgroundColor: '#404040', borderRadius: 3 }}>
+                            <Box sx={{ position: 'relative', height: 8, backgroundColor: '#424242', borderRadius: 4 }}>
                               <Box
                                 sx={{
                                   position: 'absolute',
@@ -978,52 +1118,76 @@ function App() {
                                   width: `${(mqttData[key].value / config.max) * 100}%`,
                                   backgroundColor: mqttData[key].value >= config.critical ? '#ff0000' :
                                                     mqttData[key].value >= config.warning ? '#ffff00' : '#00ff00',
-                                  borderRadius: 3,
-                                  transition: 'all 0.3s ease'
+                                  borderRadius: 4,
+                                  transition: 'all 0.3s ease',
+                                  boxShadow: '0 0 5px rgba(0,255,0,0.5)'
                                 }}
                               />
                             </Box>
                             <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
-                              <Typography variant="h6" sx={{ color: '#00ff00' }}>
+                              <Typography variant="h6" sx={{ color: '#00ff00', fontWeight: 'bold' }}>
                                 {mqttData[key].value.toFixed(1)}
                               </Typography>
-                              <Typography variant="body2" color="textSecondary">
+                              <Typography variant="body2" color="textSecondary" sx={{ fontWeight: 'bold' }}>
                                 {config.unit}
-                          </Typography>
+                              </Typography>
                             </Box>
                           </Box>
-                      </Grid>
-                    ))}
-                  </Grid>
-                </CardContent>
-              </Card>
-            </Grid>
+                        </Grid>
+                      ))}
+                    </Grid>
+                  </CardContent>
+                </Card>
+              </Grid>
 
               {/* System Parameters */}
               <Grid item xs={12} md={3}>
-                <Card sx={{ height: '100%', minHeight: 400 }}>
-                  <CardHeader title="SYSTEM PARAMETERS" />
-                  <CardContent>
+                <Card sx={{ height: '100%', minHeight: 400, border: '2px solid #424242' }}>
+                  <CardHeader 
+                    title={
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <MonitorIcon sx={{ color: '#00ff00', fontSize: 28 }} />
+                        <Typography variant="h6" sx={{ color: '#ffffff', fontWeight: 'bold' }}>SYSTEM PARAMETERS</Typography>
+                      </Box>
+                    }
+                    sx={{ 
+                      backgroundColor: '#424242',
+                      borderBottom: '2px solid #666666'
+                    }}
+                  />
+                  <CardContent sx={{ backgroundColor: '#2d2d2d' }}>
                     <Box sx={{ 
                       '& .parameter-row': {
                         display: 'flex',
                         justifyContent: 'space-between',
                         alignItems: 'center',
-                        mb: 2,
+                        mb: 3,
                         pb: 2,
-                        borderBottom: '1px solid #404040'
+                        borderBottom: '1px solid #424242'
                       }
                     }}>
                       <Box className="parameter-row">
-                        <Typography color="textSecondary">FUEL FLOW</Typography>
-                        <Typography sx={{ color: '#00ff00' }}>
+                        <Typography color="textSecondary" sx={{ fontWeight: 'bold' }}>FUEL FLOW</Typography>
+                        <Typography sx={{ color: '#00ff00', fontWeight: 'bold', fontSize: '18px' }}>
                           {engineData.fuel_flow.toFixed(2)} t/h
                         </Typography>
                       </Box>
                       <Box className="parameter-row">
-                        <Typography color="textSecondary">LUBE OIL</Typography>
-                        <Typography sx={{ color: '#00ff00' }}>
+                        <Typography color="textSecondary" sx={{ fontWeight: 'bold' }}>LUBE OIL</Typography>
+                        <Typography sx={{ color: '#00ff00', fontWeight: 'bold', fontSize: '18px' }}>
                           {mqttData.lube_oil_pressure.value.toFixed(1)} bar
+                        </Typography>
+                      </Box>
+                      <Box className="parameter-row">
+                        <Typography color="textSecondary" sx={{ fontWeight: 'bold' }}>COOLING WATER</Typography>
+                        <Typography sx={{ color: '#00ff00', fontWeight: 'bold', fontSize: '18px' }}>
+                          {mqttData.cooling_water_temp.value.toFixed(1)}°C
+                        </Typography>
+                      </Box>
+                      <Box className="parameter-row">
+                        <Typography color="textSecondary" sx={{ fontWeight: 'bold' }}>TURBOCHARGER</Typography>
+                        <Typography sx={{ color: '#00ff00', fontWeight: 'bold', fontSize: '18px' }}>
+                          {mqttData.turbocharger_speed.value.toFixed(0)} rpm
                         </Typography>
                       </Box>
                     </Box>
@@ -1032,19 +1196,29 @@ function App() {
               </Grid>
 
               {/* Alarms and Warnings */}
-            <Grid item xs={12}>
-                <Card sx={{ height: '100%' }}>
-                <CardHeader 
-                  title={
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        {plcData.alarms.length > 0 ? <ErrorIcon sx={{ color: '#ff0000' }} /> : <CheckCircleIcon sx={{ color: '#00ff00' }} />}
-                        <Typography variant="h6" sx={{ color: plcData.alarms.length > 0 ? '#ff0000' : '#00ff00' }}>
+              <Grid item xs={12}>
+                <Card sx={{ height: '100%', border: '2px solid #424242' }}>
+                  <CardHeader 
+                    title={
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        {plcData.alarms.length > 0 ? 
+                          <ErrorIcon sx={{ color: '#ff0000', fontSize: 28 }} /> : 
+                          <CheckCircleIcon sx={{ color: '#00ff00', fontSize: 28 }} />
+                        }
+                        <Typography variant="h6" sx={{ 
+                          color: plcData.alarms.length > 0 ? '#ff0000' : '#00ff00',
+                          fontWeight: 'bold'
+                        }}>
                           ALARMS & WARNINGS
-                    </Typography>
+                        </Typography>
                       </Box>
-                  }
-                />
-                <CardContent>
+                    }
+                    sx={{ 
+                      backgroundColor: '#424242',
+                      borderBottom: '2px solid #666666'
+                    }}
+                  />
+                  <CardContent sx={{ backgroundColor: '#2d2d2d' }}>
                     <Box sx={{ 
                       display: 'flex', 
                       flexDirection: 'column', 
@@ -1052,66 +1226,68 @@ function App() {
                       maxHeight: 300,
                       overflowY: 'auto'
                     }}>
-                  {plcData.alarms.length > 0 ? (
-                    plcData.alarms.map((alarm, index) => (
-                      <Alert 
+                      {plcData.alarms.length > 0 ? (
+                        plcData.alarms.map((alarm, index) => (
+                          <Alert 
                             key={index} 
                             icon={getAlarmIcon(alarm)}
-                        severity="error" 
-                        sx={{ 
+                            severity="error" 
+                            sx={{ 
                               backgroundColor: 'rgba(255, 0, 0, 0.1)',
-                              border: '1px solid #ff0000',
+                              border: '2px solid #ff0000',
                               color: '#ff0000',
+                              borderRadius: 2,
                               '& .MuiAlert-icon': {
                                 color: '#ff0000',
                                 fontSize: '1.5rem'
                               },
                               display: 'flex',
                               alignItems: 'center',
-                              py: 1
+                              py: 1.5
                             }}
                           >
-                            <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                        {alarm}
+                            <Typography variant="body1" sx={{ fontWeight: 'bold' }}>
+                              {alarm}
                             </Typography>
-                      </Alert>
-                    ))
-                  ) : (
-                    <Alert 
+                          </Alert>
+                        ))
+                      ) : (
+                        <Alert 
                           icon={<CheckCircleIcon />}
-                      severity="success"
+                          severity="success"
                           sx={{ 
                             backgroundColor: 'rgba(0, 255, 0, 0.1)',
-                            border: '1px solid #00ff00',
+                            border: '2px solid #00ff00',
                             color: '#00ff00',
+                            borderRadius: 2,
                             '& .MuiAlert-icon': {
                               color: '#00ff00',
                               fontSize: '1.5rem'
                             },
                             display: 'flex',
                             alignItems: 'center',
-                            py: 1
+                            py: 1.5
                           }}
                         >
-                          <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                          <Typography variant="body1" sx={{ fontWeight: 'bold' }}>
                             NO ACTIVE ALARMS
                           </Typography>
-                    </Alert>
-                  )}
+                        </Alert>
+                      )}
                     </Box>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              </Grid>
             </Grid>
-          </Grid>
           )}
           
           {currentTab === 1 && (
-          <TopologyView
-            engineData={engineData}
-            mqttData={mqttData}
-            plcData={plcData}
-          />
-        )}
+            <TopologyView
+              engineData={engineData}
+              mqttData={mqttData}
+              plcData={plcData}
+            />
+          )}
           
           {currentTab === 2 && (
             // Trends content
