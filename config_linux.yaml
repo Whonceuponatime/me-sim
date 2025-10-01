@@ -3,7 +3,7 @@
 
 modbus:
   host: "192.168.20.192"  # Static backend IP
-  port: 1502        # Alternative MODBUS TCP port (non-privileged)
+  port: 502         # Standard MODBUS TCP port
 
 engine:
   rpm_min: 600
@@ -33,7 +33,7 @@ security:
 # Network settings for two-VM setup
 network:
   bind_address: "192.168.20.192"  # Static backend IP
-  port: 1502               # Alternative MODBUS port (non-privileged)
+  port: 502                 # Standard MODBUS port
   max_connections: 10       # Maximum concurrent connections
   connection_timeout: 30    # Connection timeout in seconds
 

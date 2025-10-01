@@ -26,7 +26,7 @@ app.add_middleware(
 )
 
 class ModbusBridge:
-    def __init__(self, modbus_host="192.168.20.192", modbus_port=1502, config_file=None):
+    def __init__(self, modbus_host="192.168.20.192", modbus_port=502, config_file=None):
         # FORCE network interface usage - even if bridge and backend are on same machine
         # This ensures MODBUS traffic is visible in network captures
         if modbus_host in ["localhost", "127.0.0.1"]:
@@ -258,7 +258,7 @@ async def health_check():
 def main():
     parser = argparse.ArgumentParser(description='MODBUS to Web Bridge Service')
     parser.add_argument('--modbus-host', default='192.168.20.192', help='MODBUS backend host (use network IP for Wireshark visibility)')
-    parser.add_argument('--modbus-port', type=int, default=1502, help='MODBUS backend port')
+    parser.add_argument('--modbus-port', type=int, default=502, help='MODBUS backend port')
     parser.add_argument('--web-host', default='192.168.20.100', help='Web service host')
     parser.add_argument('--web-port', type=int, default=8000, help='Web service port')
     parser.add_argument('--config', help='Configuration file path')
