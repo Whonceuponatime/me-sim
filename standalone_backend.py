@@ -19,6 +19,14 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 import json
 
 class EngineDataHandler(BaseHTTPRequestHandler):
+    def do_OPTIONS(self):
+        # Handle CORS preflight requests
+        self.send_response(200)
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        self.end_headers()
+    
     def do_GET(self):
         if self.path == '/api/engine' or self.path == '/api/status':
             self.send_response(200)
@@ -37,6 +45,36 @@ class EngineDataHandler(BaseHTTPRequestHandler):
                         'load': int(self.server.simulator.current_load)
                     },
                     'timestamp': datetime.now().isoformat()
+                }
+                self.wfile.write(json.dumps(data).encode())
+            else:
+                self.wfile.write(json.dumps({'error': 'Simulator not available'}).encode())
+        else:
+            self.send_response(404)
+            self.end_headers()
+    
+    def do_POST(self):
+        if self.path == '/api/engine/start' or self.path == '/api/engine/stop':
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+            
+            # Handle engine start/stop commands
+            if hasattr(self.server, 'simulator'):
+                if 'start' in self.path:
+                    self.server.simulator._running = True
+                    self.server.simulator.status = 1
+                    message = "Engine started"
+                else:
+                    self.server.simulator._running = False
+                    self.server.simulator.status = 0
+                    message = "Engine stopped"
+                
+                data = {
+                    'status': 'success',
+                    'message': message,
+                    'engine_status': self.server.simulator.status
                 }
                 self.wfile.write(json.dumps(data).encode())
             else:
