@@ -168,6 +168,9 @@ class StandaloneEngineSimulator:
                 # Update MODBUS registers
                 self._update_modbus_registers()
                 
+                # Force MODBUS packet generation by simulating client reads
+                self._generate_modbus_traffic()
+                
                 # Periodic status output
                 loop_count += 1
                 if loop_count % 10 == 0:  # Every 10 seconds
@@ -181,6 +184,37 @@ class StandaloneEngineSimulator:
                 time.sleep(1)
         
         print("Simulation loop ended")
+    
+    def _generate_modbus_traffic(self):
+        """Generate continuous MODBUS TCP traffic by simulating client reads"""
+        try:
+            # Create a temporary client to read from ourselves
+            from pyModbusTCP.client import ModbusClient
+            
+            # Connect to our own server to generate traffic
+            client = ModbusClient(
+                host=self.config['modbus']['host'], 
+                port=self.config['modbus']['port'], 
+                auto_open=True, 
+                auto_close=True
+            )
+            
+            if client.open():
+                # Read all registers to generate MODBUS packets
+                for reg_name, reg_addr in self.config['registers'].items():
+                    try:
+                        value = client.read_holding_registers(reg_addr, 1)
+                        if value:
+                            print(f"📡 MODBUS TX: {reg_name} = {value[0]} (Register {reg_addr})")
+                    except Exception as e:
+                        print(f"Error reading {reg_name}: {e}")
+                
+                client.close()
+            else:
+                print("⚠️  Could not connect to own MODBUS server for traffic generation")
+                
+        except Exception as e:
+            print(f"Error generating MODBUS traffic: {e}")
     
     def _check_external_commands(self):
         """Check for external MODBUS commands (e.g., from vulnerability demo)"""
@@ -410,7 +444,7 @@ def main():
     """Main entry point for standalone server"""
     parser = argparse.ArgumentParser(description='Standalone MODBUS TCP Engine Simulator')
     parser.add_argument('--host', default='0.0.0.0', help='MODBUS server host (default: 0.0.0.0)')
-    parser.add_argument('--port', type=int, default=502, help='MODBUS server port (default: 502)')
+    parser.add_argument('--port', type=int, default=1502, help='MODBUS server port (default: 1502)')
     parser.add_argument('--config', help='Path to configuration file (default: config_linux.yaml)')
     
     args = parser.parse_args()

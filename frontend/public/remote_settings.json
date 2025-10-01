@@ -7,7 +7,7 @@
   "websocketUrl": null,
   "apiBaseUrl": "http://192.168.20.100:8000/api",
   "modbusHost": "192.168.20.192",
-  "modbusPort": 502,
+  "modbusPort": 1502,
   
   "reconnectDelay": 1000,
   "maxReconnectAttempts": 10,
@@ -56,10 +56,10 @@
       "services": ["modbus_bridge.py (REST API)", "React Frontend"]
     },
     "notes": [
-      "Linux VM runs MODBUS TCP server on port 502",
+      "Linux VM runs MODBUS TCP server on port 1502",
       "Windows VM runs bridge service on port 8000",
       "Frontend connects to bridge on Windows VM",
-      "Monitor MODBUS traffic: tcp.port == 502",
+      "Monitor MODBUS traffic: tcp.port == 1502",
       "Monitor REST API traffic: tcp.port == 8000"
     ]
   }
