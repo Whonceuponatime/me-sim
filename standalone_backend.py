@@ -15,6 +15,33 @@ from datetime import datetime
 from pathlib import Path
 from pyModbusTCP.server import ModbusServer
 import argparse
+from http.server import HTTPServer, BaseHTTPRequestHandler
+import json
+
+class EngineDataHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        if self.path == '/api/engine':
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+            
+            # Get current engine data from the simulator
+            if hasattr(self.server, 'simulator'):
+                data = {
+                    'status': self.server.simulator.status,
+                    'rpm': int(self.server.simulator.current_rpm),
+                    'temp': int(self.server.simulator.current_temp),
+                    'fuel_flow': self.server.simulator.current_fuel_flow,
+                    'load': int(self.server.simulator.current_load),
+                    'timestamp': datetime.now().isoformat()
+                }
+                self.wfile.write(json.dumps(data).encode())
+            else:
+                self.wfile.write(json.dumps({'error': 'Simulator not available'}).encode())
+        else:
+            self.send_response(404)
+            self.end_headers()
 
 class StandaloneEngineSimulator:
     def __init__(self, config_file=None, host="0.0.0.0", port=502):
@@ -62,6 +89,10 @@ class StandaloneEngineSimulator:
         # Simulation control
         self.simulation_running = False
         self.simulation_thread = None
+        
+        # HTTP server for frontend data
+        self.http_server = None
+        self.http_thread = None
         
         # Initialize registers to default values
         self._initialize_registers()
@@ -134,6 +165,31 @@ class StandaloneEngineSimulator:
             self.server.stop()
             print("MODBUS TCP Server stopped")
     
+    def start_http_server(self, http_port=8080):
+        """Start HTTP server for frontend data"""
+        try:
+            self.http_server = HTTPServer(('0.0.0.0', http_port), EngineDataHandler)
+            self.http_server.simulator = self  # Pass simulator reference to handler
+            
+            def run_http_server():
+                print(f"HTTP Server started on port {http_port}")
+                self.http_server.serve_forever()
+            
+            self.http_thread = threading.Thread(target=run_http_server, daemon=True)
+            self.http_thread.start()
+            print(f"✓ HTTP Server started on 0.0.0.0:{http_port}")
+            return True
+        except Exception as e:
+            print(f"✗ Failed to start HTTP server: {e}")
+            return False
+    
+    def stop_http_server(self):
+        """Stop HTTP server"""
+        if self.http_server:
+            self.http_server.shutdown()
+            self.http_server.server_close()
+            print("HTTP Server stopped")
+    
     def start_simulation(self):
         """Start the engine simulation loop"""
         if self.simulation_running:
@@ -186,12 +242,11 @@ class StandaloneEngineSimulator:
         print("Simulation loop ended")
     
     def _generate_modbus_traffic(self):
-        """Generate continuous MODBUS TCP traffic by broadcasting register updates"""
+        """Generate continuous MODBUS TCP traffic by updating registers"""
         try:
-            # Force register updates to generate MODBUS traffic
+            # Update all registers with current engine values
             registers = self.config['registers']
             
-            # Update all registers with current values to generate packets
             for reg_name, reg_addr in registers.items():
                 try:
                     if reg_name == 'status':
@@ -207,7 +262,7 @@ class StandaloneEngineSimulator:
                     else:
                         value = 0
                     
-                    # Force update the register to generate MODBUS traffic
+                    # Update the register - this generates MODBUS packets when clients read
                     self.server.data_bank.set_holding_registers(reg_addr, [value])
                     print(f"📡 MODBUS TX: {reg_name.upper()} = {value} (Register {reg_addr})")
                     
@@ -405,6 +460,11 @@ class StandaloneEngineSimulator:
                 print("Failed to start MODBUS server. Exiting.")
                 return False
             
+            # Start HTTP server for frontend
+            if not self.start_http_server():
+                print("Failed to start HTTP server. Exiting.")
+                return False
+            
             # Start simulation
             self.start_simulation()
             
@@ -412,9 +472,11 @@ class StandaloneEngineSimulator:
             print("STANDALONE ENGINE SIMULATOR RUNNING")
             print("="*60)
             print("The engine is now controllable via MODBUS TCP:")
-            print(f"  Host: {self.config['modbus']['host']}")
-            print(f"  Port: {self.config['modbus']['port']}")
+            print(f"  MODBUS Host: {self.config['modbus']['host']}")
+            print(f"  MODBUS Port: {self.config['modbus']['port']}")
             print(f"  Status Register: {self.config['registers']['status']}")
+            print("\nFrontend can access engine data via HTTP:")
+            print(f"  HTTP API: http://{self.config['modbus']['host']}:8080/api/engine")
             print("\nTo start engine: Write 1 to status register")
             print("To stop engine: Write 0 to status register")
             print("\nPress Ctrl+C to stop the server")
@@ -437,6 +499,7 @@ class StandaloneEngineSimulator:
         """Graceful shutdown"""
         print("Shutting down engine simulator...")
         self.stop_simulation()
+        self.stop_http_server()
         self.stop_server()
         print("Shutdown complete")
 

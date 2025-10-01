@@ -4,13 +4,13 @@ This project simulates an industrial engine monitoring system using MODBUS TCP c
 
 ## Architecture
 
-- **Backend (Linux VM)**: `192.168.20.192` - MODBUS TCP Server
-- **Frontend (Windows VM)**: `192.168.20.100` - React Web Interface + Bridge Service
+- **Backend (Linux VM)**: `192.168.20.192` - MODBUS TCP Server + HTTP API
+- **Frontend (Windows VM)**: `192.168.20.100` - React Web Interface
 
 ## Network Configuration
 
 - **Backend MODBUS Server**: `192.168.20.192:502`
-- **Bridge Service**: `192.168.20.100:8000`
+- **Backend HTTP API**: `192.168.20.192:8080`
 - **Frontend Web App**: `192.168.20.100:3000`
 
 ## Deployment Instructions
@@ -46,71 +46,56 @@ This project simulates an industrial engine monitoring system using MODBUS TCP c
 1. **Copy files to Windows VM:**
    ```bash
    # Copy these files to Windows VM:
-   - modbus_bridge.py
    - frontend/ (entire folder)
-   - requirements.txt
-   - start_windows_frontend.ps1
-   - start_windows_frontend.bat
+   - start_frontend.bat
    ```
 
 2. **Run the frontend:**
-   
-   **Option 1: PowerShell Script**
-   ```powershell
-   .\start_windows_frontend.ps1
-   ```
-   
-   **Option 2: Batch File**
    ```cmd
-   start_windows_frontend.bat
+   start_frontend.bat
    ```
 
 ## What Each Component Does
 
 ### Backend (Linux)
 - Runs MODBUS TCP server on port 502
+- Runs HTTP API server on port 8080
 - Simulates engine parameters (RPM, temperature, fuel flow, load)
 - Continuously sends MODBUS packets with current engine data
+- Serves engine data via HTTP API for frontend
 - Listens on all interfaces (0.0.0.0) to accept connections from Windows VM
-
-### Bridge Service (Windows)
-- Connects to Linux backend via MODBUS TCP
-- Provides REST API for the frontend
-- Translates MODBUS data to JSON format
-- Runs on port 8000
 
 ### Frontend (Windows)
 - React web application
 - Displays real-time engine data
-- Sends start/stop commands to engine
-- Connects to bridge service via REST API
+- Connects to backend HTTP API for data
 - Runs on port 3000
 
 ## Network Traffic
 
-- **MODBUS TCP**: `192.168.20.100:8000` ↔ `192.168.20.192:502`
-- **REST API**: `192.168.20.100:3000` ↔ `192.168.20.100:8000`
+- **MODBUS TCP**: Available on `192.168.20.192:502` (for external MODBUS clients)
+- **HTTP API**: `192.168.20.100:3000` ↔ `192.168.20.192:8080`
 
 ## Monitoring with Wireshark
 
 Use these filters to monitor network traffic:
 
 - **MODBUS Traffic**: `tcp.port == 502`
-- **REST API Traffic**: `tcp.port == 8000`
+- **HTTP API Traffic**: `tcp.port == 8080`
 - **All Traffic Between VMs**: `ip.addr == 192.168.20.192 and ip.addr == 192.168.20.100`
 
 ## Troubleshooting
 
 ### Backend Issues
 - Ensure Linux VM has IP `192.168.20.192`
-- Check firewall allows port 502
+- Check firewall allows ports 502 and 8080
 - Verify Python dependencies are installed
 
 ### Frontend Issues
 - Ensure Windows VM has IP `192.168.20.100`
-- Check firewall allows ports 3000 and 8000
-- Verify Node.js and Python are installed
-- Check bridge service is running before starting frontend
+- Check firewall allows port 3000
+- Verify Node.js is installed
+- Check backend HTTP API is running (http://192.168.20.192:8080/api/engine)
 
 ### Network Issues
 - Ping between VMs: `ping 192.168.20.192` (from Windows)

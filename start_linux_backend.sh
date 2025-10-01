@@ -34,8 +34,9 @@ if [ ! -f "config_linux.yaml" ]; then
     exit 1
 fi
 
-echo "Starting MODBUS TCP Server..."
-echo "The server will listen on 0.0.0.0:502 (all interfaces)"
+echo "Starting MODBUS TCP Server + HTTP API..."
+echo "MODBUS server will listen on 0.0.0.0:502 (all interfaces)"
+echo "HTTP API will listen on 0.0.0.0:8080 (all interfaces)"
 echo "Frontend can connect from 192.168.20.100"
 echo ""
 echo "Press Ctrl+C to stop the server"

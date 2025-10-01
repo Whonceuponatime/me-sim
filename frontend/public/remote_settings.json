@@ -2,10 +2,10 @@
   "comment": "Configuration for Two-VM Setup: Linux Backend + Windows Frontend",
   "comment2": "Backend runs on Linux VM, Frontend runs on Windows VM",
   
-  "_ARCHITECTURE": "VM: Linux (standalone_backend.py MODBUS) + Windows (modbus_bridge.py REST API + Frontend)",
+  "_ARCHITECTURE": "VM: Linux (standalone_backend.py MODBUS) + Windows (Frontend with MODBUS client)",
   
   "websocketUrl": null,
-  "apiBaseUrl": "http://192.168.20.100:8000/api",
+  "apiBaseUrl": "http://192.168.20.192:8080/api",
   "modbusHost": "192.168.20.192",
   "modbusPort": 502,
   
@@ -43,24 +43,25 @@
   
   "deployment": {
     "mode": "two_vm_setup",
-    "backendType": "modbus_with_bridge",
-    "dataSource": "rest_api",
+    "backendType": "modbus_with_http",
+    "dataSource": "http_api",
     "linuxVM": {
       "ip": "192.168.20.192",
       "role": "backend",
-      "services": ["standalone_backend.py (MODBUS TCP)"]
+      "services": ["standalone_backend.py (MODBUS TCP + HTTP API)"]
     },
     "windowsVM": {
       "ip": "192.168.20.100",
       "role": "frontend",
-      "services": ["modbus_bridge.py (REST API)", "React Frontend"]
+      "services": ["React Frontend"]
     },
     "notes": [
       "Linux VM runs MODBUS TCP server on port 502",
-      "Windows VM runs bridge service on port 8000",
-      "Frontend connects to bridge on Windows VM",
+      "Linux VM also runs HTTP API on port 8080",
+      "Windows VM runs React frontend",
+      "Frontend connects to HTTP API for data",
       "Monitor MODBUS traffic: tcp.port == 502",
-      "Monitor REST API traffic: tcp.port == 8000"
+      "Monitor HTTP traffic: tcp.port == 8080"
     ]
   }
 } 
