@@ -20,7 +20,7 @@ import json
 
 class EngineDataHandler(BaseHTTPRequestHandler):
     def do_GET(self):
-        if self.path == '/api/engine':
+        if self.path == '/api/engine' or self.path == '/api/status':
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
             self.send_header('Access-Control-Allow-Origin', '*')
@@ -29,11 +29,13 @@ class EngineDataHandler(BaseHTTPRequestHandler):
             # Get current engine data from the simulator
             if hasattr(self.server, 'simulator'):
                 data = {
-                    'status': self.server.simulator.status,
-                    'rpm': int(self.server.simulator.current_rpm),
-                    'temp': int(self.server.simulator.current_temp),
-                    'fuel_flow': self.server.simulator.current_fuel_flow,
-                    'load': int(self.server.simulator.current_load),
+                    'engine': {
+                        'status': self.server.simulator.status,
+                        'rpm': int(self.server.simulator.current_rpm),
+                        'temp': int(self.server.simulator.current_temp),
+                        'fuel_flow': self.server.simulator.current_fuel_flow,
+                        'load': int(self.server.simulator.current_load)
+                    },
                     'timestamp': datetime.now().isoformat()
                 }
                 self.wfile.write(json.dumps(data).encode())
