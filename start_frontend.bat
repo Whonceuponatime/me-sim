@@ -15,8 +15,16 @@ if %errorLevel% neq 0 (
     exit /b 1
 )
 
-REM Install Node.js dependencies
+REM Clean and install Node.js dependencies
 if exist "frontend\package.json" (
+    echo Cleaning up any corrupted dependencies...
+    if exist "frontend\node_modules" (
+        rmdir /s /q "frontend\node_modules"
+    )
+    if exist "frontend\package-lock.json" (
+        del "frontend\package-lock.json"
+    )
+    
     echo Installing Node.js dependencies...
     cd frontend
     npm install
